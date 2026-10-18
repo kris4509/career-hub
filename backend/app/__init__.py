@@ -18,10 +18,12 @@ def create_app():
     from .routes.jobs import jobs_bp
     from .routes.applications import applications_bp
     from .routes.admin import admin_bp
+    from .routes.profiles import profiles_bp
     app.register_blueprint(auth_bp)
     app.register_blueprint(jobs_bp)
     app.register_blueprint(applications_bp)
     app.register_blueprint(admin_bp)
+    app.register_blueprint(profiles_bp)
 
     @app.route("/api/health")
     def health():
