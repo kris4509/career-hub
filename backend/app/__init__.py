@@ -13,6 +13,10 @@ def create_app():
     jwt.init_app(app)
     cors.init_app(app, resources={r"/api/*": {"origins": "*"}})
 
+    # Register route blueprints
+    from .routes.auth import auth_bp
+    app.register_blueprint(auth_bp)
+
     @app.route("/api/health")
     def health():
         return jsonify({"status": "ok", "message": "Jobsite API is running"})
