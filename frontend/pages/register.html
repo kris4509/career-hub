@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sign up | Jobsite</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/auth.css">
+</head>
+<body class="auth-page">
+
+  <a class="auth-brand" href="../index.html"><div class="logo-mark">J</div></a>
+
+  <main class="card auth-card">
+    <h1>Create your account</h1>
+    <p class="muted">Find work, or hire great people.</p>
+
+    <div id="alert" class="alert alert-error hidden"></div>
+
+    <form id="registerForm" novalidate>
+      <div class="form-group">
+        <label>I want to</label>
+        <div class="role-options">
+          <label class="role-option">
+            <input type="radio" name="role" value="candidate" checked>
+            <span>Find work<small>Candidate</small></span>
+          </label>
+          <label class="role-option">
+            <input type="radio" name="role" value="employer">
+            <span>Hire people<small>Employer</small></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="name" id="nameLabel">Full name</label>
+        <input type="text" id="name" autocomplete="name" placeholder="Jane Wanjiku" required>
+      </div>
+      <div class="form-group">
+        <label for="email">Email</label>
+        <input type="email" id="email" autocomplete="email" placeholder="you@example.com" required>
+      </div>
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" autocomplete="new-password" placeholder="At least 8 characters" required>
+      </div>
+
+      <button type="submit" id="submitBtn" class="btn btn-primary btn-block">Create account</button>
+    </form>
+
+    <p class="auth-footer">Already have an account? <a id="loginLink" href="login.html">Log in</a></p>
+  </main>
+
+  <script src="../js/api.js"></script>
+  <script>
+    const params = new URLSearchParams(location.search);
+
+    // Only allow simple relative addresses for the "go back to" target
+    function safeNext() {
+      const next = params.get("next") || "";
+      const ok = /^[\w\-./]+(\?[\w\-=&.]*)?$/.test(next) && !next.includes("//");
+      return ok ? next : "../index.html";
+    }
+
+    if (Auth.isLoggedIn()) location.replace(safeNext());
+
+    // Keep the "go back to" target when switching to log in
+    if (params.get("next")) {
+      document.getElementById("loginLink").href =
+        "login.html?next=" + encodeURIComponent(params.get("next"));
+    }
+
+    const form = document.getElementById("registerForm");
+    const alertEl = document.getElementById("alert");
+    const btn = document.getElementById("submitBtn");
+    const nameLabel = document.getElementById("nameLabel");
+    const nameInput = document.getElementById("name");
+
+    function selectedRole() {
+      return form.querySelector('input[name="role"]:checked').value;
+    }
+
+    // The name field changes with the role
+    form.querySelectorAll('input[name="role"]').forEach((radio) => {
+      radio.addEventListener("change", () => {
+        if (selectedRole() === "employer") {
+          nameLabel.textContent = "Company name";
+          nameInput.placeholder = "Acme Ltd";
+          nameInput.autocomplete = "organization";
+        } else {
+          nameLabel.textContent = "Full name";
+          nameInput.placeholder = "Jane Wanjiku";
+          nameInput.autocomplete = "name";
+        }
+      });
+    });
+
+    function showError(message) {
+      alertEl.textContent = message;
+      alertEl.classList.remove("hidden");
+    }
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      alertEl.classList.add("hidden");
+
+      const role = selectedRole();
+      const name = nameInput.value.trim();
+      const email = document.getElementById("email").value.trim();
+      const password = document.getElementById("password").value;
+
+      if (!name) return showError(role === "employer" ? "Please enter your company name." : "Please enter your full name.");
+      if (!email || !email.includes("@")) return showError("Please enter a valid email address.");
+      if (password.length < 8) return showError("Your password must be at least 8 characters.");
+
+      btn.disabled = true;
+      btn.textContent = "Creating account...";
+      try {
+        const data = await api.register(email, password, role, name);
+        Auth.save(data.access_token, data.user);
+        location.href = safeNext();
+      } catch (err) {
+        showError(err.message);
+        btn.disabled = false;
+        btn.textContent = "Create account";
+      }
+    });
+  </script>
+</body>
+</html>

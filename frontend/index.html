@@ -3,11 +3,247 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Jobsite</title>
+  <title>Jobsite | Explore opportunities</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-  <h1>Jobsite (test page)</h1>
-  <p>Open the browser console (F12) to test the API.</p>
+
+  <aside class="sidebar">
+    <div class="sidebar-logo"><div class="logo-mark">J</div></div>
+
+    <a class="nav-item active" href="index.html">
+      <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+      Explore
+    </a>
+    <a class="nav-item" href="#">
+      <svg viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>
+      Home
+    </a>
+    <a class="nav-item" href="#">
+      <svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/></svg>
+      Applications
+    </a>
+    <a class="nav-item" href="#">
+      <svg viewBox="0 0 24 24"><path d="M22 10 12 5 2 10l10 5z"/><path d="M6 12v5c3 2 9 2 12 0v-5"/></svg>
+      Learn
+    </a>
+    <a class="nav-item" href="#">
+      <svg viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2"/></svg>
+      Earnings
+    </a>
+    <a class="nav-item" href="#">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
+      Profile
+    </a>
+    <a class="nav-item" href="#">
+      <svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+      Alerts
+    </a>
+  </aside>
+
+  <div class="main-area">
+    <header class="topbar">
+      <div class="topbar-title">Get <strong>matched to work</strong></div>
+      <div class="topbar-actions" id="authActions"></div>
+    </header>
+
+    <main class="content">
+      <h1 class="page-title">Explore opportunities</h1>
+
+      <div class="tabs" id="tabs">
+        <button class="tab active" data-type="">All jobs</button>
+        <button class="tab" data-type="full-time">Full-time</button>
+        <button class="tab" data-type="part-time">Part-time</button>
+        <button class="tab" data-type="contract">Contract</button>
+      </div>
+
+      <div class="toolbar">
+        <div class="search-field">
+          <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          <input type="text" id="search" placeholder="Type to search">
+        </div>
+        <select class="select-pill" id="workMode">
+          <option value="">All work modes</option>
+          <option value="remote">Remote</option>
+          <option value="hybrid">Hybrid</option>
+          <option value="onsite">Onsite</option>
+        </select>
+      </div>
+
+      <div id="alert" class="alert alert-error hidden"></div>
+      <div id="jobs" class="job-grid"></div>
+      <div id="pagination" class="pagination"></div>
+    </main>
+  </div>
+
   <script src="js/api.js"></script>
+  <script>
+    const PER_PAGE = 8;
+    const state = { q: "", jobType: "", workMode: "", page: 1 };
+
+    const jobsEl = document.getElementById("jobs");
+    const pagEl = document.getElementById("pagination");
+    const alertEl = document.getElementById("alert");
+    const authEl = document.getElementById("authActions");
+
+    const SPARK = '<span class="spark"><svg viewBox="0 0 24 24"><path d="M12 2l2.4 7.6L22 12l-7.6 2.4L12 22l-2.4-7.6L2 12l7.6-2.4z"/></svg></span>';
+
+    // Escape anything that came from the database before putting it in HTML
+    function esc(value) {
+      const d = document.createElement("div");
+      d.textContent = value == null ? "" : String(value);
+      return d.innerHTML;
+    }
+    function cap(s) {
+      return s ? s.charAt(0).toUpperCase() + s.slice(1) : "";
+    }
+
+    function formatPay(j) {
+      if (j.pay_min == null && j.pay_max == null) return "Pay not specified";
+      const f = (n) => Number(n).toLocaleString("en-US");
+      const range = j.pay_min != null && j.pay_max != null
+        ? `${f(j.pay_min)} - ${f(j.pay_max)}`
+        : f(j.pay_min != null ? j.pay_min : j.pay_max);
+      return `${esc(j.currency)} ${range} / month`;
+    }
+
+    function postedLabel(iso) {
+      const days = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 86400000));
+      if (days <= 7) return { text: "New opportunity", isNew: true };
+      return { text: `Posted ${days} days ago`, isNew: false };
+    }
+
+    function jobCard(j) {
+      const posted = postedLabel(j.created_at);
+      const tags = j.skills.slice(0, 3).concat(cap(j.work_mode))
+        .map((t) => `<span class="tag">${esc(t)}</span>`).join("");
+      const place = j.location ? " \u00b7 " + esc(j.location) : "";
+      return `
+        <a class="card job-card" href="pages/job-detail.html?id=${Number(j.id)}">
+          <div class="card-head">
+            <h3>${esc(j.title)}</h3>
+            <span class="apply-link">Apply \u2197</span>
+          </div>
+          <div class="pay">${formatPay(j)}</div>
+          <div class="company">${esc(j.company)}${place}</div>
+          <div class="meta">${tags}</div>
+          <div class="card-footer">
+            <div class="status-line">${posted.isNew ? SPARK : ""}<span>${posted.text}</span></div>
+            <span>${esc(cap(j.job_type))}</span>
+          </div>
+        </a>`;
+    }
+
+    function pageItems(cur, total) {
+      if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+      const set = new Set([1, total]);
+      for (let p = cur - 1; p <= cur + 1; p++) if (p > 1 && p < total) set.add(p);
+      if (cur <= 3) [2, 3, 4].forEach((p) => set.add(p));
+      if (cur >= total - 2) [total - 3, total - 2, total - 1].forEach((p) => set.add(p));
+      const sorted = [...set].sort((a, b) => a - b);
+      const out = [];
+      sorted.forEach((p, i) => {
+        if (i > 0 && p - sorted[i - 1] > 1) out.push("...");
+        out.push(p);
+      });
+      return out;
+    }
+
+    function renderPagination(page, pages) {
+      if (pages <= 1) { pagEl.innerHTML = ""; return; }
+      let html = `<button class="page-btn" data-page="${page - 1}" ${page === 1 ? "disabled" : ""}>\u2039 Previous</button>`;
+      pageItems(page, pages).forEach((p) => {
+        html += p === "..."
+          ? '<span class="page-gap">\u2026</span>'
+          : `<button class="page-btn ${p === page ? "active" : ""}" data-page="${p}">${p}</button>`;
+      });
+      html += `<button class="page-btn" data-page="${page + 1}" ${page === pages ? "disabled" : ""}>Next \u203a</button>`;
+      pagEl.innerHTML = html;
+    }
+
+    async function loadJobs() {
+      alertEl.classList.add("hidden");
+      jobsEl.innerHTML = '<div class="empty-state">Loading jobs...</div>';
+
+      const params = { page: state.page, per_page: PER_PAGE };
+      if (state.q) params.q = state.q;
+      if (state.jobType) params.job_type = state.jobType;
+      if (state.workMode) params.work_mode = state.workMode;
+
+      try {
+        const data = await api.listJobs(params);
+        if (data.jobs.length === 0) {
+          jobsEl.innerHTML = '<div class="empty-state">No jobs match your search yet.</div>';
+        } else {
+          jobsEl.innerHTML = data.jobs.map(jobCard).join("");
+        }
+        renderPagination(data.page, data.pages);
+      } catch (err) {
+        jobsEl.innerHTML = "";
+        pagEl.innerHTML = "";
+        alertEl.textContent = err.message;
+        alertEl.classList.remove("hidden");
+      }
+    }
+
+    function renderAuth() {
+      const user = Auth.getUser();
+      if (user && Auth.isLoggedIn()) {
+        authEl.innerHTML =
+          `<span class="muted">${esc(user.name || user.email)}</span>` +
+          '<button class="btn btn-outline" id="logoutBtn">Log out</button>';
+        document.getElementById("logoutBtn").addEventListener("click", () => {
+          Auth.clear();
+          renderAuth();
+        });
+      } else {
+        authEl.innerHTML =
+          '<a class="btn btn-outline" href="pages/login.html">Log in</a>' +
+          '<a class="btn btn-primary" href="pages/register.html">Sign up</a>';
+      }
+    }
+
+    // Tabs filter by job type
+    document.getElementById("tabs").addEventListener("click", (e) => {
+      const btn = e.target.closest(".tab");
+      if (!btn) return;
+      document.querySelectorAll(".tab").forEach((t) => t.classList.remove("active"));
+      btn.classList.add("active");
+      state.jobType = btn.dataset.type;
+      state.page = 1;
+      loadJobs();
+    });
+
+    // Search as you type (waits 350ms after the last keystroke)
+    let timer;
+    document.getElementById("search").addEventListener("input", (e) => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        state.q = e.target.value.trim();
+        state.page = 1;
+        loadJobs();
+      }, 350);
+    });
+
+    document.getElementById("workMode").addEventListener("change", (e) => {
+      state.workMode = e.target.value;
+      state.page = 1;
+      loadJobs();
+    });
+
+    pagEl.addEventListener("click", (e) => {
+      const btn = e.target.closest(".page-btn");
+      if (!btn || btn.disabled) return;
+      state.page = Number(btn.dataset.page);
+      loadJobs();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+
+    renderAuth();
+    loadJobs();
+  </script>
 </body>
 </html>

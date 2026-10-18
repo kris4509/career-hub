@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Log in | Jobsite</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/auth.css">
+</head>
+<body class="auth-page">
+
+  <a class="auth-brand" href="../index.html"><div class="logo-mark">J</div></a>
+
+  <main class="card auth-card">
+    <h1>Welcome back</h1>
+    <p class="muted">Log in to find work or manage your hiring.</p>
+
+    <div id="alert" class="alert alert-error hidden"></div>
+
+    <form id="loginForm" novalidate>
+      <div class="form-group">
+        <label for="email">Email</label>
+        <input type="email" id="email" autocomplete="email" placeholder="you@example.com" required>
+      </div>
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" autocomplete="current-password" placeholder="Your password" required>
+      </div>
+      <button type="submit" id="submitBtn" class="btn btn-primary btn-block">Log in</button>
+    </form>
+
+    <p class="auth-footer">New here? <a id="registerLink" href="register.html">Create an account</a></p>
+  </main>
+
+  <script src="../js/api.js"></script>
+  <script>
+    const params = new URLSearchParams(location.search);
+
+    // Only allow simple relative addresses for the "go back to" target
+    function safeNext() {
+      const next = params.get("next") || "";
+      const ok = /^[\w\-./]+(\?[\w\-=&.]*)?$/.test(next) && !next.includes("//");
+      return ok ? next : "../index.html";
+    }
+
+    // Already logged in: nothing to do here
+    if (Auth.isLoggedIn()) location.replace(safeNext());
+
+    // Keep the "go back to" target when switching to sign-up
+    if (params.get("next")) {
+      document.getElementById("registerLink").href =
+        "register.html?next=" + encodeURIComponent(params.get("next"));
+    }
+
+    const form = document.getElementById("loginForm");
+    const alertEl = document.getElementById("alert");
+    const btn = document.getElementById("submitBtn");
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      alertEl.classList.add("hidden");
+
+      const email = document.getElementById("email").value.trim();
+      const password = document.getElementById("password").value;
+      if (!email || !password) {
+        alertEl.textContent = "Please enter your email and password.";
+        alertEl.classList.remove("hidden");
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = "Logging in...";
+      try {
+        const data = await api.login(email, password);
+        Auth.save(data.access_token, data.user);
+        location.href = safeNext();
+      } catch (err) {
+        alertEl.textContent = err.message;
+        alertEl.classList.remove("hidden");
+        btn.disabled = false;
+        btn.textContent = "Log in";
+      }
+    });
+  </script>
+</body>
+</html>

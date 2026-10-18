@@ -1,0 +1,70 @@
+/* Shared styles for the login and sign-up pages */
+.auth-page {
+  min-height: 100vh;
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 2.5rem 1rem;
+}
+
+.auth-brand { margin-bottom: 1.5rem; }
+.auth-brand:hover { text-decoration: none; }
+
+.auth-card {
+  width: 100%;
+  max-width: 440px;
+  padding: 2rem;
+}
+.auth-card h1 {
+  font-size: 1.6rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.auth-card .muted { margin: 0 0 1.5rem; }
+
+.auth-footer {
+  text-align: center;
+  margin-top: 1.25rem;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+/* Role picker (candidate / employer) */
+.role-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+.role-option { position: relative; cursor: pointer; }
+.role-option input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.role-option span {
+  display: block;
+  padding: 0.85rem 0.5rem;
+  text-align: center;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+}
+.role-option small {
+  display: block;
+  margin-top: 0.15rem;
+  font-weight: 400;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+.role-option input:checked + span {
+  border-color: var(--primary);
+  background: var(--primary-light);
+  color: var(--primary-dark);
+  box-shadow: 0 0 0 1px var(--primary);
+}
+.role-option input:focus-visible + span {
+  box-shadow: 0 0 0 3px var(--primary-light);
+}
