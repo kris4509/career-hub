@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My applications | SynapseAI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    .eyebrow {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.6rem;
+      font-size: 0.78rem;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--primary);
+    }
+    .eyebrow::before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--primary);
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 1rem;
+      margin-bottom: 1.75rem;
+    }
+    .stat { padding: 1rem 1.25rem; }
+    .stat .num { font-size: 1.8rem; font-weight: 700; letter-spacing: -0.02em; }
+    .stat .lbl { color: var(--muted); font-size: 0.85rem; }
+
+    .tab .count {
+      margin-left: 0.35rem;
+      padding: 0.05rem 0.5rem;
+      border-radius: 999px;
+      background: var(--surface);
+      color: var(--muted);
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .tab.active .count { background: var(--primary-light); color: var(--primary); }
+
+    .app-list { display: grid; gap: 1rem; }
+    .app-card { padding: 1.25rem 1.5rem; }
+    .app-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+    .app-head h3 { font-size: 1.15rem; font-weight: 600; margin-bottom: 0.15rem; }
+    .app-head h3 a { color: var(--text); }
+    .app-head h3 a:hover { color: var(--primary); text-decoration: none; }
+    .app-company { color: var(--muted); }
+    .app-meta { color: var(--muted); font-size: 0.88rem; margin-top: 0.75rem; }
+    .app-letter {
+      margin-top: 0.75rem;
+      padding: 0.75rem 1rem;
+      background: var(--surface);
+      border-radius: 8px;
+      color: #374151;
+      font-size: 0.92rem;
+      white-space: pre-line;
+    }
+    .app-letter .lbl {
+      display: block;
+      margin-bottom: 0.2rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    /* Progress tracker */
+    .tracker { display: flex; align-items: center; margin-top: 1.1rem; }
+    .step { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; font-weight: 500; color: var(--muted); }
+    .step .dot {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      border: 2px solid var(--border);
+      background: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.7rem;
+      color: #fff;
+      flex-shrink: 0;
+    }
+    .step.done { color: var(--text); }
+    .step.done .dot { background: var(--primary); border-color: var(--primary); }
+    .step.current { color: var(--primary); font-weight: 600; }
+    .step.current .dot { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-light); }
+    .step.failed { color: var(--danger); font-weight: 600; }
+    .step.failed .dot { background: var(--danger); border-color: var(--danger); }
+    .line { flex: 1; height: 2px; background: var(--border); margin: 0 0.6rem; min-width: 16px; }
+    .line.done { background: var(--primary); }
+
+    @media (max-width: 700px) {
+      .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .app-head { flex-direction: column; }
+      .step span.text { display: none; }
+      .step.current span.text, .step.failed span.text { display: inline; }
+    }
+  </style>
+</head>
+<body>
+
+<aside class="sidebar" id="sidebar"></aside>
+
+  <div class="main-area">
+    <header class="topbar">
+      <div class="topbar-title">Get <strong>matched to work</strong></div>
+      <div class="topbar-actions" id="authActions"></div>
+    </header>
+
+    <main class="content">
+      <div class="eyebrow">Your applications</div>
+      <h1 class="page-title">My applications</h1>
+
+      <div id="alert" class="alert alert-error hidden"></div>
+      <div id="stats" class="stats hidden"></div>
+      <div id="tabs" class="tabs hidden"></div>
+      <div id="list" class="app-list"><div class="empty-state">Loading your applications...</div></div>
+    </main>
+  </div>
+
+  
+  <script src="../js/api.js"></script>
+  <script src="../js/nav.js"></script>
+  <script>
+    // Logged-out visitors go to log in, then come straight back here
+    if (!Auth.isLoggedIn()) {
+      location.replace("login.html?next=" + encodeURIComponent("applications.html"));
+    }
+
+    const user = Auth.getUser();
+    const authEl = document.getElementById("authActions");
+    const listEl = document.getElementById("list");
+    const tabsEl = document.getElementById("tabs");
+    const statsEl = document.getElementById("stats");
+    const alertEl = document.getElementById("alert");
+
+    const STATUSES = ["applied", "shortlisted", "accepted", "rejected"];
+    const STATUS_LABELS = {
+      applied: "Applied",
+      shortlisted: "Shortlisted",
+      accepted: "Accepted",
+      rejected: "Not selected",
+    };
+
+    let applications = [];
+    let activeFilter = "all";
+
+    // Escape anything that came from the database before putting it in HTML
+    function esc(value) {
+      const d = document.createElement("div");
+      d.textContent = value == null ? "" : String(value);
+      return d.innerHTML;
+    }
+
+    function formatDate(iso) {
+      if (!iso) return "";
+      return new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+    }
+
+    function renderAuth() {
+      authEl.innerHTML =
+        `<span class="muted">${esc(user.name || user.email)}</span>` +
+        '<button class="btn btn-outline" id="logoutBtn">Log out</button>';
+      document.getElementById("logoutBtn").addEventListener("click", () => {
+        Auth.clear();
+        location.href = "../index.html";
+      });
+    }
+
+    function tracker(status) {
+      const dot = (cls, mark) => `<span class="dot">${mark || ""}</span>`;
+      const check = "\u2713";
+
+      if (status === "rejected") {
+        return `
+          <div class="tracker">
+            <div class="step done"><span class="dot">${check}</span><span class="text">Applied</span></div>
+            <div class="line done"></div>
+            <div class="step failed"><span class="dot">\u00d7</span><span class="text">Not selected</span></div>
+          </div>`;
+      }
+
+      const order = ["applied", "shortlisted", "accepted"];
+      const reached = order.indexOf(status);
+      const parts = order.map((s, i) => {
+        let cls = "step";
+        let mark = "";
+        if (i < reached || (i === reached && status === "accepted")) { cls += " done"; mark = check; }
+        else if (i === reached) { cls += " current"; }
+        const line = i < order.length - 1
+          ? `<div class="line ${i < reached ? "done" : ""}"></div>` : "";
+        return `<div class="${cls}"><span class="dot">${mark}</span><span class="text">${STATUS_LABELS[s]}</span></div>${line}`;
+      });
+      return `<div class="tracker">${parts.join("")}</div>`;
+    }
+
+    function appCard(a) {
+      const letter = a.cover_letter
+        ? `<div class="app-letter"><span class="lbl">Your cover letter</span>${esc(a.cover_letter)}</div>` : "";
+      return `
+        <div class="card app-card">
+          <div class="app-head">
+            <div>
+              <h3><a href="job-detail.html?id=${Number(a.job_id)}">${esc(a.job_title)}</a></h3>
+              <div class="app-company">${esc(a.company)}</div>
+            </div>
+            <span class="badge badge-${esc(a.status)}">${esc(STATUS_LABELS[a.status] || a.status)}</span>
+          </div>
+          ${tracker(a.status)}
+          <div class="app-meta">Applied on ${formatDate(a.created_at)}</div>
+          ${letter}
+        </div>`;
+    }
+
+    function countFor(status) {
+      return applications.filter((a) => a.status === status).length;
+    }
+
+    function renderStats() {
+      const items = [
+        ["Total", applications.length],
+        ["Under review", countFor("applied")],
+        ["Shortlisted", countFor("shortlisted")],
+        ["Accepted", countFor("accepted")],
+      ];
+      statsEl.innerHTML = items
+        .map(([label, num]) => `<div class="card stat"><div class="num">${num}</div><div class="lbl">${label}</div></div>`)
+        .join("");
+      statsEl.classList.remove("hidden");
+    }
+
+    function renderTabs() {
+      const tabs = [["all", "All", applications.length]]
+        .concat(STATUSES.map((s) => [s, STATUS_LABELS[s], countFor(s)]));
+      tabsEl.innerHTML = tabs
+        .map(([key, label, n]) =>
+          `<button class="tab ${key === activeFilter ? "active" : ""}" data-filter="${key}">${label}<span class="count">${n}</span></button>`)
+        .join("");
+      tabsEl.classList.remove("hidden");
+    }
+
+    function renderList() {
+      if (applications.length === 0) {
+        listEl.innerHTML = `
+          <div class="empty-state">
+            You haven't applied to any jobs yet.<br><br>
+            <a class="btn btn-primary" href="../index.html">Browse jobs</a>
+          </div>`;
+        return;
+      }
+      const shown = activeFilter === "all"
+        ? applications
+        : applications.filter((a) => a.status === activeFilter);
+      listEl.innerHTML = shown.length
+        ? shown.map(appCard).join("")
+        : '<div class="empty-state">No applications with this status.</div>';
+    }
+
+    tabsEl.addEventListener("click", (e) => {
+      const btn = e.target.closest(".tab");
+      if (!btn) return;
+      activeFilter = btn.dataset.filter;
+      renderTabs();
+      renderList();
+    });
+
+    async function init() {
+      if (!Auth.isLoggedIn()) return; // redirect to login is already under way
+      renderAuth();
+
+      if (user.role !== "candidate") {
+        listEl.innerHTML = '<div class="empty-state">This page is for candidates. Log in with a candidate account to see your applications.</div>';
+        return;
+      }
+
+      try {
+        const data = await api.myApplications();
+        applications = data.applications;
+        renderStats();
+        renderTabs();
+        renderList();
+      } catch (err) {
+        if (!Auth.isLoggedIn()) {
+          // The saved login expired: send them to log in again
+          location.replace("login.html?next=" + encodeURIComponent("applications.html"));
+          return;
+        }
+        listEl.innerHTML = "";
+        alertEl.textContent = err.message;
+        alertEl.classList.remove("hidden");
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>

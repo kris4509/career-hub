@@ -472,3 +472,15 @@ th { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; colo
   .topbar { padding: 0 1.25rem; height: 72px; }
   .page-title { font-size: 1.7rem; }
 }
+/* ---------- SynapseAI wordmark ---------- */
+.wordmark {
+  font-weight: 800;
+  font-size: 1.1rem;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  color: var(--text);
+  white-space: nowrap;
+}
+.wordmark span { color: var(--primary); }
+a:hover .wordmark { text-decoration: none; }
+.auth-brand .wordmark { font-size: 1.9rem; }

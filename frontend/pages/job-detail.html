@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Job details | Jobsite</title>
+  <title>Job details | SynapseAI</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -48,7 +48,7 @@
       <svg viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>
       Home
     </a>
-    <a class="nav-item" href="#">
+    <a class="nav-item" href="applications.html">
       <svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/></svg>
       Applications
     </a>
@@ -84,6 +84,7 @@
   </div>
 
   <script src="../js/api.js"></script>
+  <script src="../js/nav.js"></script>
   <script>
     const params = new URLSearchParams(location.search);
     const jobId = Number(params.get("id"));
@@ -252,7 +253,7 @@
       try {
         const data = await api.getJob(jobId);
         job = data.job;
-        document.title = `${job.title} | Jobsite`;
+        document.title = `${job.title} | SynapseAI`;
         renderJob();
         renderApply();
       } catch (err) {
