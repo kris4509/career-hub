@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Job details | Jobsite</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    .back-link { display: inline-block; margin-bottom: 1.25rem; color: var(--muted); font-weight: 500; }
+    .back-link:hover { color: var(--primary); text-decoration: none; }
+
+    .job-layout { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 1.5rem; align-items: start; }
+    @media (max-width: 900px) { .job-layout { grid-template-columns: 1fr; } }
+
+    .job-title { font-size: 2rem; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 0.4rem; }
+    .job-sub { color: var(--muted); font-size: 1.05rem; margin-bottom: 1rem; }
+    .job-tags { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 1.5rem; }
+
+    .section-title { font-size: 1.05rem; font-weight: 600; margin: 1.5rem 0 0.5rem; }
+    .job-description { white-space: pre-line; color: #374151; }
+
+    .facts { list-style: none; margin: 0 0 1.25rem; padding: 0; }
+    .facts li { display: flex; justify-content: space-between; gap: 1rem; padding: 0.6rem 0; border-bottom: 1px solid var(--border); }
+    .facts li:last-child { border-bottom: none; }
+    .facts .label { color: var(--muted); }
+    .facts .value { font-weight: 500; text-align: right; }
+
+    .apply-card { position: sticky; top: 1.5rem; }
+    .apply-card h2 { font-size: 1.15rem; margin-bottom: 1rem; }
+    .apply-card textarea { margin-bottom: 1rem; }
+    .applied-box { text-align: center; padding: 0.5rem 0; }
+    .applied-box .badge { font-size: 0.95rem; padding: 0.3rem 1rem; margin: 0.5rem 0; }
+  </style>
+</head>
+<body>
+
+  <aside class="sidebar">
+    <div class="sidebar-logo"><a href="../index.html" style="text-decoration:none"><div class="logo-mark">J</div></a></div>
+
+    <a class="nav-item active" href="../index.html">
+      <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+      Explore
+    </a>
+    <a class="nav-item" href="#">
+      <svg viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>
+      Home
+    </a>
+    <a class="nav-item" href="#">
+      <svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/></svg>
+      Applications
+    </a>
+    <a class="nav-item" href="#">
+      <svg viewBox="0 0 24 24"><path d="M22 10 12 5 2 10l10 5z"/><path d="M6 12v5c3 2 9 2 12 0v-5"/></svg>
+      Learn
+    </a>
+    <a class="nav-item" href="#">
+      <svg viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2"/></svg>
+      Earnings
+    </a>
+    <a class="nav-item" href="#">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
+      Profile
+    </a>
+    <a class="nav-item" href="#">
+      <svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+      Alerts
+    </a>
+  </aside>
+
+  <div class="main-area">
+    <header class="topbar">
+      <div class="topbar-title">Get <strong>matched to work</strong></div>
+      <div class="topbar-actions" id="authActions"></div>
+    </header>
+
+    <main class="content">
+      <a class="back-link" href="../index.html">&larr; Back to jobs</a>
+      <div id="alert" class="alert alert-error hidden"></div>
+      <div id="jobArea"><div class="empty-state">Loading job...</div></div>
+    </main>
+  </div>
+
+  <script src="../js/api.js"></script>
+  <script>
+    const params = new URLSearchParams(location.search);
+    const jobId = Number(params.get("id"));
+    let job = null;
+
+    const jobArea = document.getElementById("jobArea");
+    const authEl = document.getElementById("authActions");
+    const alertEl = document.getElementById("alert");
+
+    // Escape anything that came from the database before putting it in HTML
+    function esc(value) {
+      const d = document.createElement("div");
+      d.textContent = value == null ? "" : String(value);
+      return d.innerHTML;
+    }
+    function cap(s) {
+      return s ? s.charAt(0).toUpperCase() + s.slice(1) : "";
+    }
+    function formatPay(j) {
+      if (j.pay_min == null && j.pay_max == null) return "Not specified";
+      const f = (n) => Number(n).toLocaleString("en-US");
+      const range = j.pay_min != null && j.pay_max != null
+        ? `${f(j.pay_min)} - ${f(j.pay_max)}`
+        : f(j.pay_min != null ? j.pay_min : j.pay_max);
+      return `${esc(j.currency)} ${range} / month`;
+    }
+    function postedLabel(iso) {
+      const days = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 86400000));
+      if (days === 0) return "Posted today";
+      if (days === 1) return "Posted yesterday";
+      return `Posted ${days} days ago`;
+    }
+
+    function renderAuth() {
+      const user = Auth.getUser();
+      if (user && Auth.isLoggedIn()) {
+        authEl.innerHTML =
+          `<span class="muted">${esc(user.name || user.email)}</span>` +
+          '<button class="btn btn-outline" id="logoutBtn">Log out</button>';
+        document.getElementById("logoutBtn").addEventListener("click", () => {
+          Auth.clear();
+          renderAuth();
+          renderApply();
+        });
+      } else {
+        authEl.innerHTML =
+          '<a class="btn btn-outline" href="login.html?next=' + encodeURIComponent("job-detail.html?id=" + jobId) + '">Log in</a>' +
+          '<a class="btn btn-primary" href="register.html?next=' + encodeURIComponent("job-detail.html?id=" + jobId) + '">Sign up</a>';
+      }
+    }
+
+    function renderJob() {
+      const tags = job.skills.map((s) => `<span class="tag">${esc(s)}</span>`).join("");
+      jobArea.innerHTML = `
+        <div class="job-layout">
+          <div class="card">
+            <h1 class="job-title">${esc(job.title)}</h1>
+            <div class="job-sub">${esc(job.company)}${job.location ? " \u00b7 " + esc(job.location) : ""}</div>
+            <div class="job-tags">
+              <span class="tag">${esc(cap(job.work_mode))}</span>
+              <span class="tag">${esc(cap(job.job_type))}</span>
+              ${tags}
+            </div>
+            <h2 class="section-title">About this role</h2>
+            <div class="job-description">${esc(job.description)}</div>
+          </div>
+
+          <aside class="card apply-card">
+            <ul class="facts">
+              <li><span class="label">Pay</span><span class="value">${formatPay(job)}</span></li>
+              <li><span class="label">Type</span><span class="value">${esc(cap(job.job_type))}</span></li>
+              <li><span class="label">Work mode</span><span class="value">${esc(cap(job.work_mode))}</span></li>
+              <li><span class="label">Location</span><span class="value">${esc(job.location || "Not specified")}</span></li>
+              <li><span class="label">Posted</span><span class="value">${postedLabel(job.created_at)}</span></li>
+            </ul>
+            <div id="applyPanel"></div>
+          </aside>
+        </div>`;
+    }
+
+    function notice(text) {
+      return `<p class="muted" style="margin:0">${text}</p>`;
+    }
+
+    function showApplied(application) {
+      document.getElementById("applyPanel").innerHTML = `
+        <div class="applied-box">
+          <div class="muted">You applied to this job</div>
+          <span class="badge badge-${esc(application.status)}">${esc(application.status)}</span>
+          <div class="muted">The employer will update your status here.</div>
+        </div>`;
+    }
+
+    async function renderApply() {
+      if (!job) return;
+      const panel = document.getElementById("applyPanel");
+      if (!panel) return;
+      const user = Auth.getUser();
+
+      if (job.status !== "open") {
+        panel.innerHTML = notice(`This job is ${esc(job.status)} and is not accepting applications.`);
+        return;
+      }
+
+      if (!user || !Auth.isLoggedIn()) {
+        const next = encodeURIComponent("job-detail.html?id=" + job.id);
+        panel.innerHTML = `
+          <a class="btn btn-primary btn-block" href="login.html?next=${next}">Log in to apply</a>
+          <p class="auth-footer" style="text-align:center;margin:0.75rem 0 0;color:var(--muted);font-size:0.9rem">
+            No account? <a href="register.html?next=${next}">Sign up</a>
+          </p>`;
+        return;
+      }
+
+      if (user.role !== "candidate") {
+        panel.innerHTML = notice("Only candidates can apply for jobs. Log in with a candidate account to apply.");
+        return;
+      }
+
+      panel.innerHTML = notice("Checking your applications...");
+      let existing = null;
+      try {
+        const data = await api.myApplications();
+        existing = data.applications.find((a) => a.job_id === job.id) || null;
+      } catch (err) {
+        // A rejected token logs the user out inside api.js; show the logged-out view
+        if (!Auth.isLoggedIn()) { renderAuth(); renderApply(); return; }
+      }
+
+      if (existing) { showApplied(existing); return; }
+
+      panel.innerHTML = `
+        <h2>Apply for this job</h2>
+        <div id="applyAlert" class="alert alert-error hidden"></div>
+        <label for="coverLetter" style="display:block;font-weight:600;font-size:0.9rem;margin-bottom:0.35rem">
+          Cover letter <span class="muted" style="font-weight:400">(optional)</span>
+        </label>
+        <textarea id="coverLetter" maxlength="2000" placeholder="Tell the employer why you're a good fit."></textarea>
+        <button class="btn btn-primary btn-block" id="applyBtn">Apply now</button>`;
+
+      document.getElementById("applyBtn").addEventListener("click", async () => {
+        const btn = document.getElementById("applyBtn");
+        const errBox = document.getElementById("applyAlert");
+        errBox.classList.add("hidden");
+        btn.disabled = true;
+        btn.textContent = "Sending...";
+        try {
+          const data = await api.apply(job.id, document.getElementById("coverLetter").value.trim());
+          showApplied(data.application);
+        } catch (err) {
+          if (err.message.includes("already applied")) { renderApply(); return; }
+          errBox.textContent = err.message;
+          errBox.classList.remove("hidden");
+          btn.disabled = false;
+          btn.textContent = "Apply now";
+        }
+      });
+    }
+
+    async function init() {
+      renderAuth();
+      if (!jobId) {
+        jobArea.innerHTML = '<div class="empty-state">That job link looks wrong. <a href="../index.html">Browse jobs</a></div>';
+        return;
+      }
+      try {
+        const data = await api.getJob(jobId);
+        job = data.job;
+        document.title = `${job.title} | Jobsite`;
+        renderJob();
+        renderApply();
+      } catch (err) {
+        jobArea.innerHTML = `<div class="empty-state">${esc(err.message)}<br><a href="../index.html">Back to jobs</a></div>`;
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>
