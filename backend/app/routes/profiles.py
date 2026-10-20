@@ -1,4 +1,5 @@
 import re
+from datetime import date, datetime, timezone
 
 from flask import Blueprint, current_app, request, jsonify
 from flask_jwt_extended import get_jwt_identity
@@ -14,10 +15,36 @@ profiles_bp = Blueprint("profiles", __name__, url_prefix="/api")
 AVAILABILITY = {"full-time", "part-time", "contract"}
 EDUCATION = {"secondary", "certificate", "diploma", "bachelors", "masters", "doctorate", "other"}
 PHONE_RE = re.compile(r"^\+?[0-9][0-9 ()\-]{6,28}$")
+MIN_AGE = 18
+MAX_AGE = 100
 
 # (field, label for error messages, maximum length)
 TEXT_FIELDS = [("headline", "Headline", 200), ("bio", "Bio", 2000), ("location", "Location", 150)]
 URL_FIELDS = [("resume_url", "Resume link", 500), ("linkedin_url", "LinkedIn link", 300), ("portfolio_url", "Portfolio link", 300)]
+
+
+def age_on(born, today):
+    return today.year - born.year - ((today.month, today.day) < (born.month, born.day))
+
+
+def parse_date_of_birth(value):
+    """Returns (date, error). Expects a real date written as YYYY-MM-DD, aged 18 to 100."""
+    if not isinstance(value, str) or not value.strip():
+        return None, "Date of birth is required"
+    try:
+        born = datetime.strptime(value.strip(), "%Y-%m-%d").date()
+    except ValueError:
+        return None, "Enter a valid date of birth"
+
+    today = datetime.now(timezone.utc).date()
+    if born > today:
+        return None, "Date of birth cannot be in the future"
+    age = age_on(born, today)
+    if age < MIN_AGE:
+        return None, f"You must be at least {MIN_AGE} years old to use SynapseAI"
+    if age > MAX_AGE:
+        return None, "Enter a valid date of birth"
+    return born, None
 
 
 def completeness(profile):
@@ -25,6 +52,7 @@ def completeness(profile):
         ("full name", bool(profile.full_name)),
         ("headline", bool(profile.headline)),
         ("phone number", bool(profile.phone)),
+        ("date of birth", profile.date_of_birth is not None),
         ("location", bool(profile.location)),
         ("education", bool(profile.education)),
         ("availability", bool(profile.availability)),
@@ -40,6 +68,7 @@ def completeness(profile):
 
 
 def candidate_to_dict(profile):
+    """Used only for a candidate's OWN profile. Employers get a separate, smaller view."""
     return {
         "id": profile.id,
         "email": profile.user.email,
@@ -48,6 +77,7 @@ def candidate_to_dict(profile):
         "bio": profile.bio,
         "location": profile.location,
         "phone": profile.phone,
+        "date_of_birth": profile.date_of_birth.isoformat() if profile.date_of_birth else None,
         "education": profile.education,
         "experience_years": profile.experience_years,
         "availability": profile.availability,
@@ -125,6 +155,12 @@ def update_my_profile():
             if error:
                 return jsonify({"error": error}), 400
             setattr(profile, field, value)
+
+    if "date_of_birth" in data:
+        born, error = parse_date_of_birth(data["date_of_birth"])
+        if error:
+            return jsonify({"error": error}), 400
+        profile.date_of_birth = born
 
     if "phone" in data:
         value, error = read_text(data, "phone", "Phone number", 30)

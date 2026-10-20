@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My profile | SynapseAI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    .eyebrow {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.6rem;
+      font-size: 0.78rem;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--primary);
+    }
+    .eyebrow::before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--primary);
+    }
+
+    .stack { display: grid; gap: 1.5rem; max-width: 860px; }
+    .card h2 { font-size: 1.25rem; margin-bottom: 1.25rem; }
+
+    /* Completeness */
+    .progress-top { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 0.6rem; }
+    .progress-top .pct { font-size: 1.6rem; font-weight: 700; letter-spacing: -0.02em; }
+    .bar { height: 10px; border-radius: 999px; background: var(--border); overflow: hidden; }
+    .bar .fill { height: 100%; background: var(--primary); border-radius: 999px; transition: width 0.4s ease; }
+    .missing { margin-top: 0.75rem; color: var(--muted); font-size: 0.9rem; }
+
+    /* Form */
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 1rem; }
+    .form-grid .full { grid-column: 1 / -1; }
+    .profile-form label {
+      font-size: 0.75rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #4b5563;
+    }
+    .hint { color: var(--muted); font-size: 0.8rem; margin-top: 0.25rem; }
+    input[readonly] { background: var(--surface); color: var(--muted); }
+
+    /* CV */
+    .dropzone {
+      border: 2px dashed var(--primary);
+      background: #f1effd;
+      border-radius: 12px;
+      padding: 2.5rem 1rem;
+      text-align: center;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .dropzone:hover, .dropzone.dragover { background: #e6e2fb; }
+    .dropzone strong { display: block; font-size: 1.05rem; font-weight: 500; }
+    .dropzone span { color: var(--muted); font-size: 0.9rem; }
+    .dropzone.busy { opacity: 0.6; pointer-events: none; }
+
+    .file-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 1rem;
+      padding: 1rem 1.25rem;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--surface);
+    }
+    .file-name { font-weight: 600; word-break: break-all; }
+    .file-meta { color: var(--muted); font-size: 0.85rem; }
+    .file-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+
+    .save-row { display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; }
+
+    @media (max-width: 700px) {
+      .form-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <aside class="sidebar" id="sidebar"></aside>
+
+  <div class="main-area">
+    <header class="topbar">
+      <div class="topbar-title">Get <strong>matched to work</strong></div>
+      <div class="topbar-actions" id="authActions"></div>
+    </header>
+
+    <main class="content">
+      <div class="eyebrow">Your profile</div>
+      <h1 class="page-title">Build your profile</h1>
+
+      <div id="alert" class="alert alert-error hidden"></div>
+      <div id="success" class="alert alert-success hidden"></div>
+      <div id="loading" class="empty-state">Loading your profile...</div>
+
+      <div id="page" class="stack hidden">
+
+        <section class="card">
+          <div class="progress-top">
+            <strong>Profile completeness</strong>
+            <span class="pct" id="pct">0%</span>
+          </div>
+          <div class="bar"><div class="fill" id="fill" style="width:0%"></div></div>
+          <div class="missing" id="missing"></div>
+        </section>
+
+        <form id="profileForm" class="card profile-form" novalidate>
+          <h2>Personal details</h2>
+          <div class="form-grid">
+            <div class="form-group full">
+              <label for="fullName">Full name</label>
+              <input type="text" id="fullName" maxlength="150" autocomplete="name" placeholder="Your full name">
+            </div>
+            <div class="form-group">
+              <label for="email">Email</label>
+              <input type="email" id="email" readonly>
+              <div class="hint">Your login email can't be changed here.</div>
+            </div>
+            <div class="form-group">
+              <label for="phone">Phone</label>
+              <input type="tel" id="phone" maxlength="30" autocomplete="tel" placeholder="+254 700 000000">
+            </div>
+            <div class="form-group">
+              <label for="dob">Date of birth</label>
+              <input type="date" id="dob" autocomplete="bday">
+              <div class="hint">You must be 18 or older. Only you can see this.</div>
+            </div>
+            <div class="form-group">
+              <label for="location">City and area</label>
+              <input type="text" id="location" maxlength="150" placeholder="e.g. Nakuru, Kenya">
+            </div>
+            <div class="form-group">
+              <label for="education">Education</label>
+              <select id="education">
+                <option value="">Select</option>
+                <option value="secondary">Secondary school</option>
+                <option value="certificate">Certificate</option>
+                <option value="diploma">Diploma</option>
+                <option value="bachelors">Bachelor's degree</option>
+                <option value="masters">Master's degree</option>
+                <option value="doctorate">Doctorate</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="experience">Years of experience</label>
+              <input type="number" id="experience" min="0" max="60" step="1" placeholder="0">
+            </div>
+            <div class="form-group">
+              <label for="availability">Availability</label>
+              <select id="availability">
+                <option value="">Select</option>
+                <option value="full-time">Full-time</option>
+                <option value="part-time">Part-time</option>
+                <option value="contract">Contract</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="linkedin">LinkedIn profile</label>
+              <input type="url" id="linkedin" maxlength="300" placeholder="https://linkedin.com/in/you">
+            </div>
+            <div class="form-group">
+              <label for="portfolio">Portfolio or GitHub</label>
+              <input type="url" id="portfolio" maxlength="300" placeholder="https://github.com/you">
+            </div>
+            <div class="form-group full">
+              <label for="headline">Headline</label>
+              <input type="text" id="headline" maxlength="200" placeholder="e.g. Junior full-stack developer">
+            </div>
+            <div class="form-group full">
+              <label for="skills">Skills</label>
+              <input type="text" id="skills" placeholder="Python, Flask, JavaScript">
+              <div class="hint">Separate skills with commas.</div>
+            </div>
+            <div class="form-group full">
+              <label for="bio">Short bio</label>
+              <textarea id="bio" maxlength="2000" placeholder="A few lines on your background and what you want to work on"></textarea>
+            </div>
+          </div>
+        </form>
+
+        <section class="card">
+          <h2>Your CV</h2>
+          <div id="cvPanel"></div>
+          <input type="file" id="fileInput" accept=".pdf,.doc,.docx" class="hidden">
+          <div class="hint" style="margin-top:0.75rem">Only you, and employers whose jobs you apply to, can open your CV.</div>
+        </section>
+
+        <div class="save-row">
+          <button type="submit" form="profileForm" class="btn btn-primary" id="saveBtn">Save profile</button>
+          <a class="btn btn-outline" href="../index.html">Browse jobs</a>
+        </div>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../js/api.js"></script>
+  <script src="../js/nav.js"></script>
+  <script>
+    // Logged-out visitors go to log in, then come straight back here
+    if (!Auth.isLoggedIn()) {
+      location.replace("login.html?next=" + encodeURIComponent("profile.html"));
+    }
+
+    const user = Auth.getUser();
+    const MAX_BYTES = 8 * 1024 * 1024;
+    const ALLOWED_EXT = [".pdf", ".doc", ".docx"];
+    const PHONE_RE = /^\+?[0-9][0-9 ()\-]{6,28}$/;
+    const MIN_AGE = 18;
+    const MAX_AGE = 100;
+
+    const $ = (id) => document.getElementById(id);
+    const alertEl = $("alert");
+    const successEl = $("success");
+    const form = $("profileForm");
+    const cvPanel = $("cvPanel");
+    const fileInput = $("fileInput");
+    const saveBtn = $("saveBtn");
+
+    let profile = null;
+
+    // Where to go after saving (set when someone is sent here from a job)
+    const params = new URLSearchParams(location.search);
+    function safeNext() {
+      const next = params.get("next") || "";
+      const ok = /^[\w\-./]+(\?[\w\-=&.]*)?$/.test(next) && !next.includes("//");
+      return ok ? next : "";
+    }
+    const next = safeNext();
+    if (next) saveBtn.textContent = "Save and continue";
+
+    // Escape anything that came from the database before putting it in HTML
+    function esc(value) {
+      const d = document.createElement("div");
+      d.textContent = value == null ? "" : String(value);
+      return d.innerHTML;
+    }
+    function formatDate(iso) {
+      if (!iso) return "";
+      return new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+    }
+    function showError(message) {
+      successEl.classList.add("hidden");
+      alertEl.textContent = message;
+      alertEl.classList.remove("hidden");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+    function showSuccess(message) {
+      alertEl.classList.add("hidden");
+      successEl.textContent = message;
+      successEl.classList.remove("hidden");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+    function clearMessages() {
+      alertEl.classList.add("hidden");
+      successEl.classList.add("hidden");
+    }
+
+    function renderAuth() {
+      $("authActions").innerHTML =
+        `<span class="muted">${esc(user.name || user.email)}</span>` +
+        '<button class="btn btn-outline" id="logoutBtn">Log out</button>';
+      $("logoutBtn").addEventListener("click", () => {
+        Auth.clear();
+        location.href = "../index.html";
+      });
+    }
+
+    // ---------- Date of birth ----------
+    function pad(n) { return String(n).padStart(2, "0"); }
+    function isoLocal(d) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
+
+    // The date picker only offers dates that make the person 18 to 100 years old
+    (function limitDobPicker() {
+      const now = new Date();
+      $("dob").max = isoLocal(new Date(now.getFullYear() - MIN_AGE, now.getMonth(), now.getDate()));
+      $("dob").min = isoLocal(new Date(now.getFullYear() - MAX_AGE, now.getMonth(), now.getDate()));
+    })();
+
+    // Returns an error message, or "" if the date is fine
+    function checkDob(value) {
+      if (!value) return "Date of birth is required.";
+      const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+      if (!m) return "Enter a valid date of birth.";
+      const y = Number(m[1]), mo = Number(m[2]), d = Number(m[3]);
+      const check = new Date(y, mo - 1, d);
+      if (check.getFullYear() !== y || check.getMonth() !== mo - 1 || check.getDate() !== d) {
+        return "Enter a valid date of birth.";
+      }
+      const now = new Date();
+      if (check > now) return "Date of birth cannot be in the future.";
+      let age = now.getFullYear() - y;
+      if (now.getMonth() + 1 < mo || (now.getMonth() + 1 === mo && now.getDate() < d)) age--;
+      if (age < MIN_AGE) return `You must be at least ${MIN_AGE} years old to use SynapseAI.`;
+      if (age > MAX_AGE) return "Enter a valid date of birth.";
+      return "";
+    }
+
+    // ---------- Completeness ----------
+    function renderProgress() {
+      const c = profile.completeness;
+      $("pct").textContent = c.percent + "%";
+      $("fill").style.width = c.percent + "%";
+      $("missing").textContent = c.missing.length
+        ? "Still to add: " + c.missing.join(", ") + "."
+        : "Your profile is complete. Nice work.";
+    }
+
+    // ---------- Form ----------
+    function fillForm() {
+      $("fullName").value = profile.full_name || "";
+      $("email").value = profile.email || "";
+      $("phone").value = profile.phone || "";
+      $("dob").value = profile.date_of_birth || "";
+      $("location").value = profile.location || "";
+      $("education").value = profile.education || "";
+      $("experience").value = profile.experience_years == null ? "" : profile.experience_years;
+      $("availability").value = profile.availability || "";
+      $("linkedin").value = profile.linkedin_url || "";
+      $("portfolio").value = profile.portfolio_url || "";
+      $("headline").value = profile.headline || "";
+      $("skills").value = (profile.skills || []).join(", ");
+      $("bio").value = profile.bio || "";
+    }
+
+    function isHttpUrl(value) {
+      return /^https?:\/\//i.test(value);
+    }
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      clearMessages();
+
+      const fullName = $("fullName").value.trim();
+      const phone = $("phone").value.trim();
+      const dob = $("dob").value;
+      const linkedin = $("linkedin").value.trim();
+      const portfolio = $("portfolio").value.trim();
+      const expRaw = $("experience").value.trim();
+
+      if (!fullName) return showError("Please enter your full name.");
+      if (phone && !PHONE_RE.test(phone)) return showError("Enter a valid phone number, for example +254 700 000000.");
+      const dobProblem = checkDob(dob);
+      if (dobProblem) return showError(dobProblem);
+      if (linkedin && !isHttpUrl(linkedin)) return showError("Your LinkedIn link must start with http:// or https://");
+      if (portfolio && !isHttpUrl(portfolio)) return showError("Your portfolio link must start with http:// or https://");
+
+      let years = 0;
+      if (expRaw !== "") {
+        years = Number(expRaw);
+        if (!Number.isInteger(years) || years < 0 || years > 60) {
+          return showError("Years of experience must be a whole number from 0 to 60.");
+        }
+      }
+
+      const skills = [...new Set(
+        $("skills").value.split(",").map((s) => s.trim()).filter(Boolean)
+      )].slice(0, 30);
+      if (skills.some((s) => s.length > 50)) return showError("Each skill must be 50 characters or fewer.");
+
+      const body = {
+        full_name: fullName,
+        phone,
+        date_of_birth: dob,
+        location: $("location").value.trim(),
+        education: $("education").value,
+        experience_years: years,
+        availability: $("availability").value,
+        linkedin_url: linkedin,
+        portfolio_url: portfolio,
+        headline: $("headline").value.trim(),
+        bio: $("bio").value.trim(),
+        skills,
+      };
+
+      saveBtn.disabled = true;
+      const label = saveBtn.textContent;
+      saveBtn.textContent = "Saving...";
+      try {
+        const data = await api.updateProfile(body);
+        profile = data.profile;
+        renderProgress();
+
+        // Keep the name in the top bar in step with the profile
+        const saved = Auth.getUser();
+        if (saved) { saved.name = profile.full_name; Auth.save(Auth.getToken(), saved); }
+        user.name = profile.full_name;
+        renderAuth();
+
+        showSuccess("Profile saved.");
+        if (next) setTimeout(() => { location.href = next; }, 700);
+      } catch (err) {
+        showError(err.message);
+      } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = label;
+      }
+    });
+
+    // ---------- CV ----------
+    function renderCv() {
+      if (profile.has_resume) {
+        cvPanel.innerHTML = `
+          <div class="file-row">
+            <div>
+              <div class="file-name">${esc(profile.resume_filename || "Your CV")}</div>
+              <div class="file-meta">Uploaded ${formatDate(profile.resume_uploaded_at)}</div>
+            </div>
+            <div class="file-actions">
+              <button type="button" class="btn btn-small btn-outline" id="viewCv">View</button>
+              <button type="button" class="btn btn-small btn-outline" id="replaceCv">Replace</button>
+              <button type="button" class="btn btn-small btn-outline" id="removeCv">Remove</button>
+            </div>
+          </div>`;
+        $("viewCv").addEventListener("click", viewCv);
+        $("replaceCv").addEventListener("click", () => fileInput.click());
+        $("removeCv").addEventListener("click", removeCv);
+      } else {
+        cvPanel.innerHTML = `
+          <div class="dropzone" id="dropzone" tabindex="0" role="button">
+            <strong>Drop your CV here or click to choose</strong>
+            <span>PDF, DOC or DOCX, up to 8 MB</span>
+          </div>`;
+        const dz = $("dropzone");
+        dz.addEventListener("click", () => fileInput.click());
+        dz.addEventListener("keydown", (e) => {
+          if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fileInput.click(); }
+        });
+        dz.addEventListener("dragover", (e) => { e.preventDefault(); dz.classList.add("dragover"); });
+        dz.addEventListener("dragleave", () => dz.classList.remove("dragover"));
+        dz.addEventListener("drop", (e) => {
+          e.preventDefault();
+          dz.classList.remove("dragover");
+          if (e.dataTransfer.files.length) uploadCv(e.dataTransfer.files[0]);
+        });
+      }
+    }
+
+    function checkFile(file) {
+      const name = file.name.toLowerCase();
+      if (!ALLOWED_EXT.some((ext) => name.endsWith(ext))) return "Please upload a PDF, DOC or DOCX file.";
+      if (file.size === 0) return "That file is empty.";
+      if (file.size > MAX_BYTES) return "That file is too large. The limit is 8 MB.";
+      return "";
+    }
+
+    async function uploadCv(file) {
+      clearMessages();
+      const problem = checkFile(file);
+      if (problem) return showError(problem);
+
+      const dz = $("dropzone");
+      if (dz) {
+        dz.classList.add("busy");
+        dz.querySelector("strong").textContent = "Uploading...";
+      }
+      try {
+        const data = await api.uploadResume(file);
+        profile = data.profile;
+        renderCv();
+        renderProgress();
+        showSuccess("Your CV was uploaded.");
+      } catch (err) {
+        renderCv();
+        showError(err.message);
+      }
+    }
+
+    fileInput.addEventListener("change", () => {
+      const file = fileInput.files[0];
+      fileInput.value = ""; // lets the same file be chosen again
+      if (file) uploadCv(file);
+    });
+
+    async function viewCv() {
+      clearMessages();
+      // Open the tab first so the browser doesn't block it as a pop-up
+      const tab = window.open("about:blank", "_blank");
+      try {
+        const data = await api.resumeLink();
+        if (tab) { tab.opener = null; tab.location = data.url; }
+        else location.href = data.url;
+      } catch (err) {
+        if (tab) tab.close();
+        showError(err.message);
+      }
+    }
+
+    async function removeCv() {
+      if (!confirm("Remove your CV? You can upload a new one at any time.")) return;
+      clearMessages();
+      try {
+        const data = await api.deleteResume();
+        profile = data.profile;
+        renderCv();
+        renderProgress();
+        showSuccess("Your CV was removed.");
+      } catch (err) {
+        showError(err.message);
+      }
+    }
+
+    // ---------- Start ----------
+    async function init() {
+      if (!Auth.isLoggedIn()) return; // redirect to login is already under way
+      renderAuth();
+
+      if (user.role !== "candidate") {
+        $("loading").textContent = "This page is for candidates. Log in with a candidate account to build a profile.";
+        return;
+      }
+
+      try {
+        const data = await api.getProfile();
+        profile = data.profile;
+        fillForm();
+        renderProgress();
+        renderCv();
+        $("loading").classList.add("hidden");
+        $("page").classList.remove("hidden");
+      } catch (err) {
+        if (!Auth.isLoggedIn()) {
+          // The saved login expired: send them to log in again
+          location.replace("login.html?next=" + encodeURIComponent("profile.html"));
+          return;
+        }
+        $("loading").classList.add("hidden");
+        showError(err.message);
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>

@@ -76,6 +76,7 @@ class CandidateProfile(db.Model):
     resume_path = db.Column(db.String(300))  # file path inside the private bucket
     resume_filename = db.Column(db.String(200))  # original file name, for display
     resume_uploaded_at = db.Column(db.DateTime(timezone=True))
+    date_of_birth = db.Column(db.Date)
 
     user = db.relationship("User", back_populates="candidate_profile")
     skills = db.relationship("Skill", secondary=candidate_skills, backref="candidates")

@@ -24,7 +24,10 @@ const Auth = {
 
 async function apiRequest(path, { method = "GET", body, auth = false } = {}) {
   const headers = {};
-  if (body !== undefined) headers["Content-Type"] = "application/json";
+  const isForm = typeof FormData !== "undefined" && body instanceof FormData;
+
+  // For file uploads the browser sets the Content-Type itself
+  if (body !== undefined && !isForm) headers["Content-Type"] = "application/json";
   if (auth && Auth.getToken()) headers["Authorization"] = `Bearer ${Auth.getToken()}`;
 
   let response;
@@ -32,7 +35,7 @@ async function apiRequest(path, { method = "GET", body, auth = false } = {}) {
     response = await fetch(`${API_BASE}${path}`, {
       method,
       headers,
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      body: body === undefined ? undefined : isForm ? body : JSON.stringify(body),
     });
   } catch (networkError) {
     throw new Error("Cannot reach the server. Is the backend running?");
@@ -77,8 +80,17 @@ const api = {
   jobApplicants: (jobId) => apiRequest(`/jobs/${jobId}/applications`, { auth: true }),
   setApplicationStatus: (id, status) =>
     apiRequest(`/applications/${id}`, { method: "PATCH", body: { status }, auth: true }),
+  applicantResumeLink: (applicationId) =>
+    apiRequest(`/applications/${applicationId}/resume`, { auth: true }),
 
-  // Candidate profile
+  // Candidate profile and CV
   getProfile: () => apiRequest("/profile/candidate", { auth: true }),
   updateProfile: (fields) => apiRequest("/profile/candidate", { method: "PUT", body: fields, auth: true }),
+  uploadResume: (file) => {
+    const form = new FormData();
+    form.append("file", file);
+    return apiRequest("/profile/candidate/resume", { method: "POST", body: form, auth: true });
+  },
+  deleteResume: () => apiRequest("/profile/candidate/resume", { method: "DELETE", auth: true }),
+  resumeLink: () => apiRequest("/profile/candidate/resume/link", { auth: true }),
 };
