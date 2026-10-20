@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Applicants | SynapseAI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    .eyebrow {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.6rem;
+      font-size: 0.78rem;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--primary);
+    }
+    .eyebrow::before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--primary);
+    }
+    .back-link { display: inline-block; margin-bottom: 1.25rem; color: var(--muted); font-weight: 500; }
+    .back-link:hover { color: var(--primary); text-decoration: none; }
+
+    .tab .count {
+      margin-left: 0.35rem;
+      padding: 0.05rem 0.5rem;
+      border-radius: 999px;
+      background: var(--surface);
+      color: var(--muted);
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .tab.active .count { background: var(--primary-light); color: var(--primary); }
+
+    .applicant-list { display: grid; gap: 1rem; }
+    .applicant { padding: 1.25rem 1.5rem; }
+    .ap-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+    .ap-head h3 { font-size: 1.15rem; font-weight: 600; margin-bottom: 0.1rem; }
+    .ap-headline { color: #374151; }
+    .ap-facts {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem 1.25rem;
+      margin-top: 0.75rem;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+    .ap-skills { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.85rem; }
+    .ap-letter {
+      margin-top: 0.85rem;
+      padding: 0.75rem 1rem;
+      background: var(--surface);
+      border-radius: 8px;
+      color: #374151;
+      font-size: 0.92rem;
+      white-space: pre-line;
+    }
+    .ap-letter .lbl {
+      display: block;
+      margin-bottom: 0.2rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .ap-actions {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.5rem;
+      margin-top: 1rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--border);
+    }
+    .ap-actions .spacer { flex: 1; }
+    .btn-success { background: var(--success); color: #fff; }
+    .btn-success:hover:not(:disabled) { background: #166534; }
+    @media (max-width: 700px) {
+      .ap-head { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+
+  <aside class="sidebar" id="sidebar"></aside>
+
+  <div class="main-area">
+    <header class="topbar">
+      <div class="topbar-title">Hire <strong>great people</strong></div>
+      <div class="topbar-actions" id="authActions"></div>
+    </header>
+
+    <main class="content">
+      <a class="back-link" href="employer.html">&larr; Back to dashboard</a>
+      <div class="eyebrow">Applicants</div>
+      <h1 class="page-title" id="pageTitle">Applicants</h1>
+
+      <div id="alert" class="alert alert-error hidden"></div>
+      <div id="tabs" class="tabs hidden"></div>
+      <div id="list" class="applicant-list"><div class="empty-state">Loading applicants...</div></div>
+    </main>
+  </div>
+
+  <script src="../js/api.js"></script>
+  <script src="../js/nav.js"></script>
+  <script>
+    const params = new URLSearchParams(location.search);
+    const jobId = Number(params.get("id"));
+    const returnTo = "applicants.html?id=" + jobId;
+
+    // Logged-out visitors go to log in, then come straight back here
+    if (!Auth.isLoggedIn()) {
+      location.replace("login.html?next=" + encodeURIComponent(returnTo));
+    }
+
+    const user = Auth.getUser();
+    const authEl = document.getElementById("authActions");
+    const listEl = document.getElementById("list");
+    const tabsEl = document.getElementById("tabs");
+    const alertEl = document.getElementById("alert");
+    const titleEl = document.getElementById("pageTitle");
+
+    const STATUSES = ["applied", "shortlisted", "accepted", "rejected"];
+    const STATUS_LABELS = {
+      applied: "Applied",
+      shortlisted: "Shortlisted",
+      accepted: "Accepted",
+      rejected: "Not selected",
+    };
+
+    let applications = [];
+    let activeFilter = "all";
+
+    // Escape anything that came from the database before putting it in HTML
+    function esc(value) {
+      const d = document.createElement("div");
+      d.textContent = value == null ? "" : String(value);
+      return d.innerHTML;
+    }
+    function cap(s) {
+      return s ? s.charAt(0).toUpperCase() + s.slice(1) : "";
+    }
+    function formatDate(iso) {
+      if (!iso) return "";
+      return new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+    }
+    function showError(message) {
+      alertEl.textContent = message;
+      alertEl.classList.remove("hidden");
+    }
+
+    function renderAuth() {
+      authEl.innerHTML =
+        `<span class="muted">${esc(user.name || user.email)}</span>` +
+        '<button class="btn btn-outline" id="logoutBtn">Log out</button>';
+      document.getElementById("logoutBtn").addEventListener("click", () => {
+        Auth.clear();
+        location.href = "../index.html";
+      });
+    }
+
+    function countFor(status) {
+      return applications.filter((a) => a.status === status).length;
+    }
+
+    function renderTabs() {
+      const tabs = [["all", "All", applications.length]]
+        .concat(STATUSES.map((s) => [s, STATUS_LABELS[s], countFor(s)]));
+      tabsEl.innerHTML = tabs
+        .map(([key, label, n]) =>
+          `<button class="tab ${key === activeFilter ? "active" : ""}" data-filter="${key}">${label}<span class="count">${n}</span></button>`)
+        .join("");
+      tabsEl.classList.remove("hidden");
+    }
+
+    function actionButtons(a) {
+      const btn = (status, label, cls) =>
+        `<button class="btn btn-small ${cls}" data-action="${status}" data-id="${Number(a.id)}" ${a.status === status ? "disabled" : ""}>${label}</button>`;
+      return (
+        btn("shortlisted", "Shortlist", "btn-outline") +
+        btn("accepted", "Accept", "btn-success") +
+        '<span class="spacer"></span>' +
+        btn("rejected", "Reject", "btn-outline")
+      );
+    }
+
+    function applicantCard(a) {
+      const c = a.candidate;
+      const skills = c.skills.map((s) => `<span class="tag">${esc(s)}</span>`).join("");
+
+      const facts = [];
+      if (c.location) facts.push(esc(c.location));
+      if (c.experience_years != null) facts.push(`${Number(c.experience_years)} yr${Number(c.experience_years) === 1 ? "" : "s"} experience`);
+      if (c.availability) facts.push(esc(cap(c.availability)));
+      facts.push(`<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>`);
+
+      // Only link to addresses that start with http(s)
+      const resume = c.resume_url && /^https?:\/\//i.test(c.resume_url)
+        ? `<a class="btn btn-small btn-outline" href="${esc(c.resume_url)}" target="_blank" rel="noopener noreferrer">View CV \u2197</a>`
+        : '<span class="muted" style="font-size:0.88rem">No CV added</span>';
+
+      const letter = a.cover_letter
+        ? `<div class="ap-letter"><span class="lbl">Cover letter</span>${esc(a.cover_letter)}</div>`
+        : "";
+
+      return `
+        <div class="card applicant" id="app-${Number(a.id)}">
+          <div class="ap-head">
+            <div>
+              <h3>${esc(c.full_name)}</h3>
+              ${c.headline ? `<div class="ap-headline">${esc(c.headline)}</div>` : ""}
+            </div>
+            <span class="badge badge-${esc(a.status)}">${esc(STATUS_LABELS[a.status] || a.status)}</span>
+          </div>
+          <div class="ap-facts">${facts.map((f) => `<span>${f}</span>`).join("")}</div>
+          ${skills ? `<div class="ap-skills">${skills}</div>` : ""}
+          ${letter}
+          <div class="ap-actions">
+            ${actionButtons(a)}
+            ${resume}
+          </div>
+          <div class="muted" style="font-size:0.82rem;margin-top:0.75rem">Applied on ${formatDate(a.created_at)}</div>
+        </div>`;
+    }
+
+    function renderList() {
+      if (applications.length === 0) {
+        listEl.innerHTML = '<div class="card empty-state">Nobody has applied to this job yet.</div>';
+        return;
+      }
+      const shown = activeFilter === "all"
+        ? applications
+        : applications.filter((a) => a.status === activeFilter);
+      listEl.innerHTML = shown.length
+        ? shown.map(applicantCard).join("")
+        : '<div class="empty-state">No applicants with this status.</div>';
+    }
+
+    tabsEl.addEventListener("click", (e) => {
+      const btn = e.target.closest(".tab");
+      if (!btn) return;
+      activeFilter = btn.dataset.filter;
+      renderTabs();
+      renderList();
+    });
+
+    // Shortlist / Accept / Reject
+    listEl.addEventListener("click", async (e) => {
+      const btn = e.target.closest("button[data-action]");
+      if (!btn || btn.disabled) return;
+
+      const id = Number(btn.dataset.id);
+      const status = btn.dataset.action;
+      const app = applications.find((a) => a.id === id);
+      if (!app) return;
+
+      if (status === "rejected" && !confirm(`Reject ${app.candidate.full_name}? They will see "Not selected" on their applications page.`)) {
+        return;
+      }
+
+      alertEl.classList.add("hidden");
+      btn.disabled = true;
+      try {
+        const data = await api.setApplicationStatus(id, status);
+        app.status = data.application.status;
+        renderTabs();
+        renderList();
+      } catch (err) {
+        btn.disabled = false;
+        showError(err.message);
+      }
+    });
+
+    async function init() {
+      if (!Auth.isLoggedIn()) return; // redirect to login is already under way
+      renderAuth();
+
+      if (user.role !== "employer") {
+        listEl.innerHTML = '<div class="card empty-state">This page is for employers. Log in with an employer account to review applicants.</div>';
+        return;
+      }
+      if (!jobId) {
+        listEl.innerHTML = '<div class="card empty-state">That link looks wrong. <a href="employer.html">Back to dashboard</a></div>';
+        return;
+      }
+
+      try {
+        const [jobData, appData] = await Promise.all([api.getJob(jobId), api.jobApplicants(jobId)]);
+        titleEl.textContent = jobData.job.title;
+        document.title = `${jobData.job.title} applicants | SynapseAI`;
+        applications = appData.applications;
+        renderTabs();
+        renderList();
+      } catch (err) {
+        if (!Auth.isLoggedIn()) {
+          // The saved login expired: send them to log in again
+          location.replace("login.html?next=" + encodeURIComponent(returnTo));
+          return;
+        }
+        listEl.innerHTML = `<div class="card empty-state">${esc(err.message)}<br><br><a href="employer.html">Back to dashboard</a></div>`;
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>

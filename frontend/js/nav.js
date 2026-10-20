@@ -16,7 +16,7 @@
   const ITEMS = [
     { label: "Explore", href: "index.html", icon: "search", roles: ["guest", "candidate", "employer", "admin"], also: ["job-detail.html"] },
     { label: "Applications", href: "pages/applications.html", icon: "applications", roles: ["guest", "candidate"] },
-    { label: "Dashboard", href: "pages/employer.html", icon: "dashboard", roles: ["employer"] },
+    { label: "Dashboard", href: "pages/employer.html", icon: "dashboard", roles: ["employer"], also: ["applicants.html"] },
   ];
 
   function currentRole() {

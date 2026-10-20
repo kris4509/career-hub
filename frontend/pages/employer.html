@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Employer dashboard | SynapseAI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    .eyebrow {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.6rem;
+      font-size: 0.78rem;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--primary);
+    }
+    .eyebrow::before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--primary);
+    }
+
+    .head-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+    .head-row .page-title { margin: 0; }
+
+    .notice {
+      padding: 0.85rem 1rem;
+      border-radius: 8px;
+      margin-bottom: 1.25rem;
+      font-size: 0.92rem;
+      background: #fef3c7;
+      color: #92400e;
+      border: 1px solid #fde68a;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 1rem;
+      margin-bottom: 1.75rem;
+    }
+    .stat { padding: 1rem 1.25rem; }
+    .stat .num { font-size: 1.8rem; font-weight: 700; letter-spacing: -0.02em; }
+    .stat .lbl { color: var(--muted); font-size: 0.85rem; }
+
+    .post-card { margin-bottom: 1.75rem; }
+    .post-card h2 { font-size: 1.2rem; margin-bottom: 1.25rem; }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 1rem; }
+    .form-grid .full { grid-column: 1 / -1; }
+    .hint { color: var(--muted); font-size: 0.8rem; margin-top: 0.25rem; }
+    .form-actions { display: flex; gap: 0.75rem; margin-top: 0.5rem; }
+
+    .jobs-card { padding: 0; overflow: hidden; }
+    .jobs-card th:first-child, .jobs-card td:first-child { padding-left: 1.5rem; }
+    .jobs-card th:last-child, .jobs-card td:last-child { padding-right: 1.5rem; }
+    .jobs-card tr:last-child td { border-bottom: none; }
+    .job-name { font-weight: 600; color: var(--text); }
+    .job-name:hover { color: var(--primary); text-decoration: none; }
+    .job-sub { color: var(--muted); font-size: 0.85rem; }
+
+    @media (max-width: 700px) {
+      .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .form-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <aside class="sidebar" id="sidebar"></aside>
+
+  <div class="main-area">
+    <header class="topbar">
+      <div class="topbar-title">Hire <strong>great people</strong></div>
+      <div class="topbar-actions" id="authActions"></div>
+    </header>
+
+    <main class="content">
+      <div class="eyebrow">Employer dashboard</div>
+      <div class="head-row">
+        <h1 class="page-title" id="pageTitle">Your jobs</h1>
+        <button class="btn btn-primary hidden" id="toggleFormBtn">Post a job</button>
+      </div>
+
+      <div id="alert" class="alert alert-error hidden"></div>
+      <div id="success" class="alert alert-success hidden"></div>
+      <div id="approvalNotice" class="notice hidden"></div>
+
+      <div id="stats" class="stats hidden"></div>
+
+      <section id="postCard" class="card post-card hidden">
+        <h2>Post a new job</h2>
+        <div id="formAlert" class="alert alert-error hidden"></div>
+        <form id="jobForm" novalidate>
+          <div class="form-grid">
+            <div class="form-group full">
+              <label for="title">Job title</label>
+              <input type="text" id="title" maxlength="200" placeholder="e.g. Backend Engineer (Python)">
+            </div>
+            <div class="form-group full">
+              <label for="description">Description</label>
+              <textarea id="description" maxlength="5000" placeholder="What will the person do? What skills or experience do they need?"></textarea>
+            </div>
+            <div class="form-group">
+              <label for="location">Location</label>
+              <input type="text" id="location" maxlength="150" placeholder="e.g. Nairobi, or Anywhere in Kenya">
+            </div>
+            <div class="form-group">
+              <label for="workMode">Work mode</label>
+              <select id="workMode">
+                <option value="remote">Remote</option>
+                <option value="hybrid">Hybrid</option>
+                <option value="onsite">Onsite</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="jobType">Job type</label>
+              <select id="jobType">
+                <option value="full-time">Full-time</option>
+                <option value="part-time">Part-time</option>
+                <option value="contract">Contract</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="currency">Currency</label>
+              <select id="currency">
+                <option value="KES">KES</option>
+                <option value="USD">USD</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="payMin">Pay from (per month)</label>
+              <input type="number" id="payMin" min="0" step="1" placeholder="e.g. 80000">
+            </div>
+            <div class="form-group">
+              <label for="payMax">Pay up to (per month)</label>
+              <input type="number" id="payMax" min="0" step="1" placeholder="e.g. 120000">
+            </div>
+            <div class="form-group full">
+              <label for="skills">Skills</label>
+              <input type="text" id="skills" placeholder="Python, Flask, PostgreSQL">
+              <div class="hint">Separate skills with commas.</div>
+            </div>
+          </div>
+          <p class="muted" style="margin:0 0 1rem;font-size:0.88rem">New jobs are reviewed by an admin before they appear on the site.</p>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary" id="submitBtn">Submit job</button>
+            <button type="button" class="btn btn-outline" id="cancelBtn">Cancel</button>
+          </div>
+        </form>
+      </section>
+
+      <div id="jobsArea"><div class="empty-state">Loading your jobs...</div></div>
+    </main>
+  </div>
+
+  <script src="../js/api.js"></script>
+  <script src="../js/nav.js"></script>
+  <script>
+    // Logged-out visitors go to log in, then come straight back here
+    if (!Auth.isLoggedIn()) {
+      location.replace("login.html?next=" + encodeURIComponent("employer.html"));
+    }
+
+    const user = Auth.getUser();
+    const authEl = document.getElementById("authActions");
+    const jobsArea = document.getElementById("jobsArea");
+    const statsEl = document.getElementById("stats");
+    const alertEl = document.getElementById("alert");
+    const successEl = document.getElementById("success");
+    const noticeEl = document.getElementById("approvalNotice");
+    const postCard = document.getElementById("postCard");
+    const toggleBtn = document.getElementById("toggleFormBtn");
+    const form = document.getElementById("jobForm");
+    const formAlert = document.getElementById("formAlert");
+    const submitBtn = document.getElementById("submitBtn");
+
+    const STATUS_LABELS = { pending: "Pending approval", open: "Live", closed: "Closed" };
+
+    // Escape anything that came from the database before putting it in HTML
+    function esc(value) {
+      const d = document.createElement("div");
+      d.textContent = value == null ? "" : String(value);
+      return d.innerHTML;
+    }
+    function cap(s) {
+      return s ? s.charAt(0).toUpperCase() + s.slice(1) : "";
+    }
+    function formatDate(iso) {
+      if (!iso) return "";
+      return new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+    }
+    function formatPay(j) {
+      if (j.pay_min == null && j.pay_max == null) return "Pay not specified";
+      const f = (n) => Number(n).toLocaleString("en-US");
+      const range = j.pay_min != null && j.pay_max != null
+        ? `${f(j.pay_min)} - ${f(j.pay_max)}`
+        : f(j.pay_min != null ? j.pay_min : j.pay_max);
+      return `${esc(j.currency)} ${range} / month`;
+    }
+
+    function show(el, message) {
+      el.textContent = message;
+      el.classList.remove("hidden");
+    }
+    function hide(el) {
+      el.classList.add("hidden");
+    }
+
+    function renderAuth() {
+      authEl.innerHTML =
+        `<span class="muted">${esc(user.name || user.email)}</span>` +
+        '<button class="btn btn-outline" id="logoutBtn">Log out</button>';
+      document.getElementById("logoutBtn").addEventListener("click", () => {
+        Auth.clear();
+        location.href = "../index.html";
+      });
+    }
+
+    function renderStats(jobs) {
+      const live = jobs.filter((j) => j.status === "open").length;
+      const pending = jobs.filter((j) => j.status === "pending").length;
+      const applicants = jobs.reduce((sum, j) => sum + (j.applicant_count || 0), 0);
+      const items = [["Jobs posted", jobs.length], ["Live", live], ["Pending approval", pending], ["Total applicants", applicants]];
+      statsEl.innerHTML = items
+        .map(([label, num]) => `<div class="card stat"><div class="num">${num}</div><div class="lbl">${label}</div></div>`)
+        .join("");
+      statsEl.classList.remove("hidden");
+    }
+
+    function renderJobs(jobs) {
+      if (jobs.length === 0) {
+        jobsArea.innerHTML = `
+          <div class="card empty-state">
+            You haven't posted any jobs yet.<br><br>
+            <button class="btn btn-primary" id="emptyPostBtn">Post your first job</button>
+          </div>`;
+        document.getElementById("emptyPostBtn").addEventListener("click", openForm);
+        return;
+      }
+
+      const rows = jobs.map((j) => {
+        const n = j.applicant_count || 0;
+        const applicants = n > 0
+          ? `<a href="applicants.html?id=${Number(j.id)}">${n} applicant${n === 1 ? "" : "s"}</a>`
+          : '<span class="muted">None yet</span>';
+        const place = j.location ? " \u00b7 " + esc(j.location) : "";
+        return `
+          <tr>
+            <td>
+              <a class="job-name" href="job-detail.html?id=${Number(j.id)}">${esc(j.title)}</a>
+              <div class="job-sub">${esc(cap(j.job_type))} \u00b7 ${esc(cap(j.work_mode))}${place}</div>
+              <div class="job-sub">${formatPay(j)}</div>
+            </td>
+            <td><span class="badge badge-${esc(j.status)}">${esc(STATUS_LABELS[j.status] || j.status)}</span></td>
+            <td>${applicants}</td>
+            <td>${formatDate(j.created_at)}</td>
+          </tr>`;
+      }).join("");
+
+      jobsArea.innerHTML = `
+        <div class="card jobs-card table-wrap">
+          <table>
+            <thead><tr><th>Job</th><th>Status</th><th>Applicants</th><th>Posted</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>`;
+    }
+
+    function openForm() {
+      hide(successEl);
+      postCard.classList.remove("hidden");
+      document.getElementById("title").focus();
+      postCard.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+    function closeForm() {
+      postCard.classList.add("hidden");
+      hide(formAlert);
+      form.reset();
+    }
+
+    toggleBtn.addEventListener("click", openForm);
+    document.getElementById("cancelBtn").addEventListener("click", closeForm);
+
+    function readPay(id, label) {
+      const raw = document.getElementById(id).value.trim();
+      if (raw === "") return { value: null };
+      const n = Number(raw);
+      if (!Number.isInteger(n) || n < 0) return { error: `${label} must be a whole number, 0 or more.` };
+      return { value: n };
+    }
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      hide(formAlert);
+
+      const title = document.getElementById("title").value.trim();
+      const description = document.getElementById("description").value.trim();
+      if (!title) return show(formAlert, "Please enter a job title.");
+      if (!description) return show(formAlert, "Please enter a description.");
+
+      const min = readPay("payMin", "Pay from");
+      const max = readPay("payMax", "Pay up to");
+      if (min.error) return show(formAlert, min.error);
+      if (max.error) return show(formAlert, max.error);
+      if (min.value != null && max.value != null && min.value > max.value) {
+        return show(formAlert, "'Pay from' cannot be higher than 'Pay up to'.");
+      }
+
+      const skills = [...new Set(
+        document.getElementById("skills").value.split(",").map((s) => s.trim()).filter(Boolean)
+      )].slice(0, 15);
+
+      const body = {
+        title,
+        description,
+        location: document.getElementById("location").value.trim(),
+        work_mode: document.getElementById("workMode").value,
+        job_type: document.getElementById("jobType").value,
+        currency: document.getElementById("currency").value,
+        skills,
+      };
+      if (min.value != null) body.pay_min = min.value;
+      if (max.value != null) body.pay_max = max.value;
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Submitting...";
+      try {
+        await api.createJob(body);
+        closeForm();
+        show(successEl, "Job submitted. It will appear on the site once an admin approves it.");
+        await loadJobs();
+      } catch (err) {
+        show(formAlert, err.message);
+      } finally {   
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Submit job";
+      }
+    });
+
+    async function loadJobs() {
+      try {
+        const data = await api.myJobs();
+        renderStats(data.jobs);
+        renderJobs(data.jobs);
+      } catch (err) {
+        if (!Auth.isLoggedIn()) {
+          // The saved login expired: send them to log in again
+          location.replace("login.html?next=" + encodeURIComponent("employer.html"));
+          return;
+        }
+        jobsArea.innerHTML = "";
+        show(alertEl, err.message);
+      }
+    }
+
+    async function init() {
+      if (!Auth.isLoggedIn()) return; // redirect to login is already under way
+      renderAuth();
+
+      if (user.role !== "employer") {
+        document.getElementById("pageTitle").textContent = "Employer dashboard";
+        jobsArea.innerHTML = '<div class="card empty-state">This page is for employers. Log in with an employer account to post and manage jobs.</div>';
+        return;
+      }
+
+      toggleBtn.classList.remove("hidden");
+
+      // Ask the server whether this company has been approved yet
+      try {
+        const me = await api.me();
+        if (me.user.is_approved === false) {
+          show(noticeEl, "Your company is waiting for admin approval. You can post jobs now, but nothing goes live until you are approved.");
+        }
+      } catch (err) {
+        // not critical: the dashboard still works without the notice
+      }
+
+      await loadJobs();
+    }
+
+    init();
+  </script>
+</body>
+</html>

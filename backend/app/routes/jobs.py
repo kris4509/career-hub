@@ -167,4 +167,9 @@ def my_jobs():
         .order_by(Job.created_at.desc())
         .all()
     )
-    return jsonify({"jobs": [job_to_dict(j) for j in jobs]})
+    result = []
+    for j in jobs:
+        data = job_to_dict(j)
+        data["applicant_count"] = len(j.applications)
+        result.append(data)
+    return jsonify({"jobs": result})
