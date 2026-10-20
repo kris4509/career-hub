@@ -65,8 +65,17 @@ class CandidateProfile(db.Model):
     location = db.Column(db.String(150))
     experience_years = db.Column(db.Integer, default=0)
     availability = db.Column(db.String(50))  # e.g. full-time, part-time, contract
-    resume_url = db.Column(db.String(500))
+    resume_url = db.Column(db.String(500))  # optional link (Drive, LinkedIn...)
     created_at = db.Column(db.DateTime(timezone=True), default=utcnow)
+
+    # Added for onboarding
+    phone = db.Column(db.String(30))
+    education = db.Column(db.String(50))
+    linkedin_url = db.Column(db.String(300))
+    portfolio_url = db.Column(db.String(300))
+    resume_path = db.Column(db.String(300))  # file path inside the private bucket
+    resume_filename = db.Column(db.String(200))  # original file name, for display
+    resume_uploaded_at = db.Column(db.DateTime(timezone=True))
 
     user = db.relationship("User", back_populates="candidate_profile")
     skills = db.relationship("Skill", secondary=candidate_skills, backref="candidates")

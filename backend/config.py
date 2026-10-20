@@ -21,3 +21,11 @@ class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     # Checks that a connection is alive before using it (helps with Supabase pooler)
     SQLALCHEMY_ENGINE_OPTIONS = {"pool_pre_ping": True}
+
+    # Supabase Storage (private bucket for CVs)
+    SUPABASE_URL = (os.getenv("SUPABASE_URL") or "").strip().rstrip("/")
+    SUPABASE_SERVICE_KEY = (os.getenv("SUPABASE_SERVICE_KEY") or "").strip()
+    SUPABASE_BUCKET = (os.getenv("SUPABASE_BUCKET") or "resumes").strip()
+
+    # Reject any request body over 9 MB (CVs are limited to 8 MB, plus form overhead)
+    MAX_CONTENT_LENGTH = 9 * 1024 * 1024

@@ -4,3 +4,4 @@ Flask-JWT-Extended
 Flask-CORS
 python-dotenv
 psycopg2-binary
+requests
