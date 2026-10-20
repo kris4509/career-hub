@@ -9,6 +9,7 @@
     dashboard:
       '<rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/>',
     profile: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
+    shield: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
   };
 
   // roles: who sees the link. "guest" means logged out.
@@ -17,6 +18,7 @@
     { label: "Explore", href: "index.html", icon: "search", roles: ["guest", "candidate", "employer", "admin"], also: ["job-detail.html"] },
     { label: "Applications", href: "pages/applications.html", icon: "applications", roles: ["guest", "candidate"] },
     { label: "Dashboard", href: "pages/employer.html", icon: "dashboard", roles: ["employer"], also: ["applicants.html"] },
+    { label: "Admin", href: "pages/admin.html", icon: "shield", roles: ["admin"] },
   ];
 
   function currentRole() {

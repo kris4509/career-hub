@@ -68,7 +68,13 @@ def list_jobs():
     if status in ("pending", "open", "closed"):
         query = query.filter_by(status=status)
     jobs = query.order_by(Job.created_at.desc()).all()
-    return jsonify({"jobs": [job_to_dict(j) for j in jobs]})
+    result = []
+    for j in jobs:
+        data = job_to_dict(j)
+        data["employer_id"] = j.employer_id
+        data["employer_approved"] = j.employer.is_approved
+        result.append(data)
+    return jsonify({"jobs": result})
 
 
 @admin_bp.route("/jobs/<int:job_id>", methods=["PATCH"])

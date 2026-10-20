@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin | SynapseAI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    .eyebrow {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.6rem;
+      font-size: 0.78rem;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--primary);
+    }
+    .eyebrow::before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--primary);
+    }
+
+    .tab .count {
+      margin-left: 0.35rem;
+      padding: 0.05rem 0.5rem;
+      border-radius: 999px;
+      background: var(--surface);
+      color: var(--muted);
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .tab.active .count { background: var(--primary-light); color: var(--primary); }
+    .tab .count.alert-count { background: #fef3c7; color: #92400e; }
+
+    .panel-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+    }
+    .panel-bar select { width: auto; min-width: 180px; }
+
+    .table-card { padding: 0; overflow: hidden; }
+    .table-card th:first-child, .table-card td:first-child { padding-left: 1.5rem; }
+    .table-card th:last-child, .table-card td:last-child { padding-right: 1.5rem; }
+    .table-card tr:last-child td { border-bottom: none; }
+    .name { font-weight: 600; color: var(--text); }
+    a.name:hover { color: var(--primary); text-decoration: none; }
+    .sub { color: var(--muted); font-size: 0.85rem; }
+    .actions { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+    .note { color: var(--muted); font-size: 0.85rem; margin-top: 1rem; }
+    .warn-badge { background: #fef3c7; color: #92400e; }
+    .btn-success { background: var(--success); color: #fff; }
+    .btn-success:hover:not(:disabled) { background: #166534; }
+  </style>
+</head>
+<body>
+
+  <aside class="sidebar" id="sidebar"></aside>
+
+  <div class="main-area">
+    <header class="topbar">
+      <div class="topbar-title">Admin <strong>panel</strong></div>
+      <div class="topbar-actions" id="authActions"></div>
+    </header>
+
+    <main class="content">
+      <div class="eyebrow">Admin</div>
+      <h1 class="page-title">Review and manage</h1>
+
+      <div id="alert" class="alert alert-error hidden"></div>
+      <div id="success" class="alert alert-success hidden"></div>
+      <div id="tabs" class="tabs hidden"></div>
+      <div id="panel"><div class="empty-state">Loading...</div></div>
+    </main>
+  </div>
+
+  <script src="../js/api.js"></script>
+  <script src="../js/nav.js"></script>
+  <script>
+    // Logged-out visitors go to log in, then come straight back here
+    if (!Auth.isLoggedIn()) {
+      location.replace("login.html?next=" + encodeURIComponent("admin.html"));
+    }
+
+    const user = Auth.getUser();
+    const authEl = document.getElementById("authActions");
+    const panelEl = document.getElementById("panel");
+    const tabsEl = document.getElementById("tabs");
+    const alertEl = document.getElementById("alert");
+    const successEl = document.getElementById("success");
+
+    // The admin routes are called directly here (apiRequest comes from api.js)
+    const adminApi = {
+      jobs: () => apiRequest("/admin/jobs", { auth: true }),
+      employers: () => apiRequest("/admin/employers", { auth: true }),
+      users: () => apiRequest("/admin/users", { auth: true }),
+      setJob: (id, status) => apiRequest(`/admin/jobs/${id}`, { method: "PATCH", body: { status }, auth: true }),
+      setEmployer: (id, is_approved) => apiRequest(`/admin/employers/${id}`, { method: "PATCH", body: { is_approved }, auth: true }),
+      setUser: (id, is_active) => apiRequest(`/admin/users/${id}`, { method: "PATCH", body: { is_active }, auth: true }),
+    };
+
+    const JOB_LABELS = { pending: "Pending", open: "Live", closed: "Closed" };
+
+    let data = { jobs: [], employers: [], users: [] };
+    let activeTab = "jobs";
+    let jobFilter = "pending";
+
+    // Escape anything that came from the database before putting it in HTML
+    function esc(value) {
+      const d = document.createElement("div");
+      d.textContent = value == null ? "" : String(value);
+      return d.innerHTML;
+    }
+    function cap(s) {
+      return s ? s.charAt(0).toUpperCase() + s.slice(1) : "";
+    }
+    function formatDate(iso) {
+      if (!iso) return "";
+      return new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+    }
+    function showError(message) {
+      successEl.classList.add("hidden");
+      alertEl.textContent = message;
+      alertEl.classList.remove("hidden");
+    }
+    function showSuccess(message) {
+      alertEl.classList.add("hidden");
+      successEl.textContent = message;
+      successEl.classList.remove("hidden");
+    }
+
+    function renderAuth() {
+      authEl.innerHTML =
+        `<span class="muted">${esc(user.name || user.email)}</span>` +
+        '<button class="btn btn-outline" id="logoutBtn">Log out</button>';
+      document.getElementById("logoutBtn").addEventListener("click", () => {
+        Auth.clear();
+        location.href = "../index.html";
+      });
+    }
+
+    // ---------- Tabs ----------
+    function renderTabs() {
+      const pendingJobs = data.jobs.filter((j) => j.status === "pending").length;
+      const waitingEmployers = data.employers.filter((e) => !e.is_approved).length;
+      const tabs = [
+        ["jobs", "Jobs", pendingJobs, pendingJobs > 0],
+        ["employers", "Employers", waitingEmployers, waitingEmployers > 0],
+        ["users", "Users", data.users.length, false],
+      ];
+      tabsEl.innerHTML = tabs
+        .map(([key, label, n, highlight]) =>
+          `<button class="tab ${key === activeTab ? "active" : ""}" data-tab="${key}">${label}` +
+          `<span class="count ${highlight && key !== activeTab ? "alert-count" : ""}">${n}</span></button>`)
+        .join("");
+      tabsEl.classList.remove("hidden");
+    }
+
+    // ---------- Jobs ----------
+    function jobActions(j) {
+      const id = Number(j.id);
+      const employerId = Number(j.employer_id);
+      const btn = (act, label, cls) =>
+        `<button class="btn btn-small ${cls}" data-act="${act}" data-id="${id}" data-employer="${employerId}">${label}</button>`;
+
+      if (j.status === "pending") {
+        const approve = j.employer_approved
+          ? btn("approve", "Approve", "btn-success")
+          : btn("approve-both", "Approve company + job", "btn-success");
+        return approve + btn("reject", "Reject", "btn-outline");
+      }
+      if (j.status === "open") return btn("close", "Close", "btn-outline");
+      return j.employer_approved
+        ? btn("reopen", "Reopen", "btn-outline")
+        : btn("approve-both", "Approve company + reopen", "btn-outline");
+    }
+
+    function renderJobs() {
+      const counts = { pending: 0, open: 0, closed: 0 };
+      data.jobs.forEach((j) => { counts[j.status] = (counts[j.status] || 0) + 1; });
+
+      const filterOptions = [
+        ["pending", `Pending approval (${counts.pending})`],
+        ["open", `Live (${counts.open})`],
+        ["closed", `Closed (${counts.closed})`],
+        ["all", `All jobs (${data.jobs.length})`],
+      ].map(([v, l]) => `<option value="${v}" ${v === jobFilter ? "selected" : ""}>${l}</option>`).join("");
+
+      const shown = jobFilter === "all" ? data.jobs : data.jobs.filter((j) => j.status === jobFilter);
+
+      let body;
+      if (shown.length === 0) {
+        body = `<div class="card empty-state">${jobFilter === "pending" ? "Nothing waiting for approval. All caught up." : "No jobs here."}</div>`;
+      } else {
+        const rows = shown.map((j) => {
+          const place = j.location ? " \u00b7 " + esc(j.location) : "";
+          const employerBadge = j.employer_approved
+            ? ""
+            : '<div style="margin-top:0.35rem"><span class="badge warn-badge">Company not approved</span></div>';
+          return `
+            <tr>
+              <td>
+                <a class="name" href="job-detail.html?id=${Number(j.id)}">${esc(j.title)}</a>
+                <div class="sub">${esc(j.company)}${place}</div>
+                <div class="sub">${esc(cap(j.job_type))} \u00b7 ${esc(cap(j.work_mode))}</div>
+              </td>
+              <td><span class="badge badge-${esc(j.status)}">${esc(JOB_LABELS[j.status] || j.status)}</span>${employerBadge}</td>
+              <td>${formatDate(j.created_at)}</td>
+              <td><div class="actions">${jobActions(j)}</div></td>
+            </tr>`;
+        }).join("");
+        body = `
+          <div class="card table-card table-wrap">
+            <table>
+              <thead><tr><th>Job</th><th>Status</th><th>Posted</th><th>Actions</th></tr></thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>`;
+      }
+
+      panelEl.innerHTML = `
+        <div class="panel-bar"><select id="jobFilter">${filterOptions}</select></div>
+        ${body}`;
+    }
+
+    // ---------- Employers ----------
+    function renderEmployers() {
+      if (data.employers.length === 0) {
+        panelEl.innerHTML = '<div class="card empty-state">No employers have signed up yet.</div>';
+        return;
+      }
+      const rows = data.employers.map((e) => {
+        const status = e.is_approved
+          ? '<span class="badge badge-accepted">Approved</span>'
+          : '<span class="badge badge-pending">Waiting</span>';
+        const action = e.is_approved
+          ? `<button class="btn btn-small btn-outline" data-act="revoke-employer" data-id="${Number(e.id)}" data-name="${esc(e.company_name)}">Revoke</button>`
+          : `<button class="btn btn-small btn-success" data-act="approve-employer" data-id="${Number(e.id)}">Approve</button>`;
+        return `
+          <tr>
+            <td>
+              <div class="name">${esc(e.company_name)}</div>
+              ${e.location ? `<div class="sub">${esc(e.location)}</div>` : ""}
+            </td>
+            <td>${esc(e.email)}</td>
+            <td>${status}</td>
+            <td>${formatDate(e.created_at)}</td>
+            <td><div class="actions">${action}</div></td>
+          </tr>`;
+      }).join("");
+
+      panelEl.innerHTML = `
+        <div class="card table-card table-wrap">
+          <table>
+            <thead><tr><th>Company</th><th>Email</th><th>Status</th><th>Joined</th><th>Actions</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+        <p class="note">Revoking a company stops its new jobs from being approved. It does not take jobs that are already live offline. Close those in the Jobs tab.</p>`;
+    }
+
+    // ---------- Users ----------
+    function renderUsers() {
+      if (data.users.length === 0) {
+        panelEl.innerHTML = '<div class="card empty-state">No users yet.</div>';
+        return;
+      }
+      const rows = data.users.map((u) => {
+        const status = u.is_active
+          ? '<span class="badge badge-open">Active</span>'
+          : '<span class="badge badge-closed">Disabled</span>';
+        let action;
+        if (u.id === user.id) {
+          action = '<span class="muted">This is you</span>';
+        } else if (u.is_active) {
+          action = `<button class="btn btn-small btn-outline" data-act="disable-user" data-id="${Number(u.id)}" data-name="${esc(u.email)}">Disable</button>`;
+        } else {
+          action = `<button class="btn btn-small btn-success" data-act="enable-user" data-id="${Number(u.id)}">Enable</button>`;
+        }
+        return `
+          <tr>
+            <td class="name">${esc(u.email)}</td>
+            <td><span class="badge">${esc(u.role)}</span></td>
+            <td>${status}</td>
+            <td>${formatDate(u.created_at)}</td>
+            <td><div class="actions">${action}</div></td>
+          </tr>`;
+      }).join("");
+
+      panelEl.innerHTML = `
+        <div class="card table-card table-wrap">
+          <table>
+            <thead><tr><th>Email</th><th>Role</th><th>Status</th><th>Joined</th><th>Actions</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+        <p class="note">A disabled user can't log in. Someone already logged in may stay signed in for a few more minutes.</p>`;
+    }
+
+    function render() {
+      renderTabs();
+      if (activeTab === "jobs") renderJobs();
+      else if (activeTab === "employers") renderEmployers();
+      else renderUsers();
+    }
+
+    // ---------- Events ----------
+    tabsEl.addEventListener("click", (e) => {
+      const btn = e.target.closest(".tab");
+      if (!btn) return;
+      activeTab = btn.dataset.tab;
+      render();
+    });
+
+    panelEl.addEventListener("change", (e) => {
+      if (e.target.id === "jobFilter") {
+        jobFilter = e.target.value;
+        renderJobs();
+      }
+    });
+
+    panelEl.addEventListener("click", async (e) => {
+      const btn = e.target.closest("button[data-act]");
+      if (!btn || btn.disabled) return;
+
+      const id = Number(btn.dataset.id);
+      const act = btn.dataset.act;
+      let message = "";
+
+      if (act === "reject" && !confirm("Reject this job? It will be closed and will not appear on the site.")) return;
+      if (act === "close" && !confirm("Close this job? It will disappear from the site.")) return;
+      if (act === "revoke-employer" && !confirm(`Revoke approval for ${btn.dataset.name}?`)) return;
+      if (act === "disable-user" && !confirm(`Disable ${btn.dataset.name}? They won't be able to log in.`)) return;
+
+      btn.disabled = true;
+      try {
+        if (act === "approve" || act === "reopen") {
+          await adminApi.setJob(id, "open");
+          message = "Job is now live.";
+        } else if (act === "approve-both") {
+          await adminApi.setEmployer(Number(btn.dataset.employer), true);
+          await adminApi.setJob(id, "open");
+          message = "Company approved and job is now live.";
+        } else if (act === "reject" || act === "close") {
+          await adminApi.setJob(id, "closed");
+          message = "Job closed.";
+        } else if (act === "approve-employer") {
+          await adminApi.setEmployer(id, true);
+          message = "Company approved.";
+        } else if (act === "revoke-employer") {
+          await adminApi.setEmployer(id, false);
+          message = "Company approval revoked.";
+        } else if (act === "disable-user") {
+          await adminApi.setUser(id, false);
+          message = "User disabled.";
+        } else if (act === "enable-user") {
+          await adminApi.setUser(id, true);
+          message = "User enabled.";
+        }
+        await loadAll();
+        showSuccess(message);
+      } catch (err) {
+        btn.disabled = false;
+        showError(err.message);
+      }
+    });
+
+    async function loadAll() {
+      const [jobs, employers, users] = await Promise.all([
+        adminApi.jobs(), adminApi.employers(), adminApi.users(),
+      ]);
+      data = { jobs: jobs.jobs, employers: employers.employers, users: users.users };
+      render();
+    }
+
+    async function init() {
+      if (!Auth.isLoggedIn()) return; // redirect to login is already under way
+      renderAuth();
+
+      if (user.role !== "admin") {
+        panelEl.innerHTML = '<div class="card empty-state">This page is for admins only.</div>';
+        return;
+      }
+
+      try {
+        await loadAll();
+      } catch (err) {
+        if (!Auth.isLoggedIn()) {
+          // The saved login expired: send them to log in again
+          location.replace("login.html?next=" + encodeURIComponent("admin.html"));
+          return;
+        }
+        panelEl.innerHTML = "";
+        showError(err.message);
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>
