@@ -32,6 +32,7 @@ def application_to_dict(app_obj, include_candidate=False):
             "experience_years": c.experience_years,
             "availability": c.availability,
             "resume_url": c.resume_url,
+            "has_resume": bool(c.resume_path),
             "skills": [s.name for s in c.skills],
         }
     return data

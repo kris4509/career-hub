@@ -209,10 +209,15 @@
       if (c.availability) facts.push(esc(cap(c.availability)));
       facts.push(`<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>`);
 
-      // Only link to addresses that start with http(s)
-      const resume = c.resume_url && /^https?:\/\//i.test(c.resume_url)
-        ? `<a class="btn btn-small btn-outline" href="${esc(c.resume_url)}" target="_blank" rel="noopener noreferrer">View CV \u2197</a>`
-        : '<span class="muted" style="font-size:0.88rem">No CV added</span>';
+      // An uploaded CV opens through a short-lived link; an older pasted link still works
+      let resume;
+      if (c.has_resume) {
+        resume = `<button class="btn btn-small btn-outline" data-view-cv="${Number(a.id)}">View CV \u2197</button>`;
+      } else if (c.resume_url && /^https?:\/\//i.test(c.resume_url)) {
+        resume = `<a class="btn btn-small btn-outline" href="${esc(c.resume_url)}" target="_blank" rel="noopener noreferrer">View CV \u2197</a>`;
+      } else {
+        resume = '<span class="muted" style="font-size:0.88rem">No CV added</span>';
+      }
 
       const letter = a.cover_letter
         ? `<div class="ap-letter"><span class="lbl">Cover letter</span>${esc(a.cover_letter)}</div>`
@@ -285,6 +290,27 @@
         showError(err.message);
       }
     });
+
+        // View CV: ask the server for a link that works for 5 minutes
+    listEl.addEventListener("click", async (e) => {
+      const btn = e.target.closest("button[data-view-cv]");
+      if (!btn) return;
+
+      alertEl.classList.add("hidden");
+      // Open the tab first so the browser doesn't block it as a pop-up
+      const tab = window.open("about:blank", "_blank");
+      btn.disabled = true;
+      try {
+        const data = await api.applicantResumeLink(Number(btn.dataset.viewCv));
+        if (tab) { tab.opener = null; tab.location = data.url; }
+        else location.href = data.url;
+      } catch (err) {
+        if (tab) tab.close();
+        showError(err.message);
+      } finally {
+        btn.disabled = false;
+      }
+    }); 
 
     async function init() {
       if (!Auth.isLoggedIn()) return; // redirect to login is already under way
